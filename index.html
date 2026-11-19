@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src https://bhwmxanakzrkqtdghyvo.supabase.co wss://bhwmxanakzrkqtdghyvo.supabase.co https://generativelanguage.googleapis.com wss://generativelanguage.googleapis.com; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#14121f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -101,28 +103,91 @@ ul.k{margin:0;padding-left:18px;line-height:1.6}
 details summary{cursor:pointer;color:var(--mute);font-size:13px}
 .tx{font-size:13.5px;line-height:1.55;max-height:300px;overflow:auto;margin-top:8px}
 .tx p{margin:5px 0}
+.syncchip{font-size:12px;font-weight:600;color:var(--mute);margin-left:6px;vertical-align:middle;letter-spacing:0}
+.syncchip.ok{color:var(--accent2)}
+.syncchip.err{color:var(--bad)}
+.linkbtn{color:var(--mute);font-size:13px;text-decoration:underline;margin-top:14px;display:block;width:100%}
+.pc.off{opacity:.45;position:relative}
+.pc .lock,.lock{display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:var(--warn)}
+.badge{display:inline-block;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--warn);color:#1b1022;letter-spacing:.5px}
+.adminrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line)}
+.adminrow:first-child{border-top:0}
+.adminrow small{color:var(--mute)}
+.abtns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.mini{padding:7px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-size:12.5px;font-weight:700}
+.mini.pri{background:var(--accent);border-color:var(--accent);color:#1b1022}
+.mini.bad{color:var(--bad)}
+.syncchip{font-size:12px;font-weight:600;color:var(--mute);margin-left:6px;vertical-align:middle;letter-spacing:0}
+.syncchip.ok{color:var(--accent2)}
+.syncchip.err{color:var(--bad)}
+select option:disabled{color:#777}
+.callbtn:disabled{background:var(--panel2);color:var(--mute);box-shadow:none}
 </style>
+
 </head>
 <body>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- LOADING -->
+<section class="screen on" id="loading">
+  <div class="wrap"><div class="loading"><div class="spin"></div>불러오는 중…</div></div>
+</section>
+
+<!-- AUTH -->
+<section class="screen" id="auth">
+  <div class="wrap">
+    <div class="top"><div class="logo">Ring<span>o</span> 📞</div></div>
+    <div class="card">
+      <div class="h">☁️ 로그인하면 노트북·폰 어디서든 기억이 이어져요</div>
+      <label style="margin-top:0" for="aEmail">이메일</label>
+      <input id="aEmail" type="email" autocomplete="username" maxlength="120" placeholder="you@example.com">
+      <label for="aPw">비밀번호 (8자 이상)</label>
+      <input id="aPw" type="password" autocomplete="current-password" maxlength="72">
+      <div style="height:14px"></div>
+      <button class="btn pri" id="loginBtn">로그인</button>
+      <div style="height:10px"></div>
+      <button class="btn" id="signupBtn">처음이에요 — 가입 신청하기</button>
+      <p class="note">가입하면 확인 메일이 가요. 메일 인증 후 관리자가 승인하면 사용할 수 있어요.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PENDING / BLOCKED -->
+<section class="screen" id="pending">
+  <div class="wrap">
+    <div class="top"><div class="logo">Ring<span>o</span> 📞</div></div>
+    <div class="card">
+      <div style="font-size:40px">⏳</div>
+      <h2 id="pTitle" style="margin:8px 0">승인 대기 중이에요</h2>
+      <p class="note" id="pBody">가입 신청이 접수됐어요. 관리자가 확인한 뒤 승인하면 바로 쓸 수 있어요.</p>
+      <p class="note" id="pEmail"></p>
+      <button class="btn pri" id="pRefresh">승인됐는지 확인하기</button>
+      <div style="height:10px"></div>
+      <button class="btn" data-act="logout">로그아웃</button>
+    </div>
+  </div>
+</section>
 
 <!-- HOME -->
-<section class="screen on" id="home">
+<section class="screen" id="home">
   <div class="wrap">
     <div class="top">
-      <div class="logo">Ring<span>o</span> 📞</div>
+      <div class="logo">Ring<span>o</span> 📞<span class="syncchip" id="syncChip"></span></div>
       <div class="row" style="flex:0;gap:8px">
-        <button class="iconbtn" onclick="go('history')" title="기록">🗂️</button>
-        <button class="iconbtn" onclick="go('settings')" title="설정">⚙️</button>
+        <button class="iconbtn" id="adminBtn" title="사용자 관리" style="display:none">👥</button>
+        <button class="iconbtn" data-go="history" title="기록">🗂️</button>
+        <button class="iconbtn" data-go="settings" title="설정">⚙️</button>
       </div>
     </div>
 
-    <div class="card" id="keyWarn" style="display:none;border-color:var(--warn)">
-      <div class="h" style="color:var(--warn)">처음 한 번만 설정하면 돼요</div>
-      <div class="note">무료 Gemini API 키가 필요해요. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>에서 1분이면 발급됩니다. 발급 후 ⚙️ 설정에 붙여넣기!</div>
+    <div class="card" id="testerCard" style="display:none">
+      <div class="row" style="align-items:center">
+        <div><span class="badge">TESTER</span> <b id="usageText">오늘 무료 통화 0/3</b></div>
+      </div>
+      <p class="note" id="usageNote" style="margin:8px 0 0">테스터는 Jamie와 영어로, 한 번에 최대 5분까지 무료로 통화할 수 있어요.</p>
     </div>
 
-    <div class="card">
+    <div class="card" id="profileCard">
       <div class="h">누가 통화하나요?</div>
       <div class="chips" id="profileChips"></div>
     </div>
@@ -148,15 +213,14 @@ details summary{cursor:pointer;color:var(--mute);font-size:13px}
 
     <div class="card">
       <div class="row">
-        <div><label style="margin-top:0">통화 시간</label>
-          <select id="durSel"><option value="5">5분</option><option value="10" selected>10분</option><option value="15">15분</option><option value="20">20분</option></select></div>
-        <div><label style="margin-top:0">자막</label>
+        <div><label style="margin-top:0" for="durSel">통화 시간</label><select id="durSel"></select></div>
+        <div><label style="margin-top:0" for="capSel">자막</label>
           <select id="capSel"><option value="0">끄기 (진짜 전화처럼)</option><option value="1">켜기</option></select></div>
       </div>
-      <p class="note" style="margin:12px 0 0">💡 이어폰을 쓰면 상대 목소리가 마이크로 다시 들어가지 않아서 훨씬 자연스러워요. 상대가 말하는 중에 그냥 말을 끊어도 됩니다.</p>
+      <p class="note" style="margin:12px 0 0">💡 이어폰을 쓰면 훨씬 자연스러워요. 상대가 말하는 중에 그냥 말을 끊어도 됩니다.</p>
     </div>
   </div>
-  <button class="callbtn" id="callBtn" onclick="startCall()">📞 전화 걸기</button>
+  <button class="callbtn" id="callBtn">📞 전화 걸기</button>
 </section>
 
 <!-- CALL -->
@@ -172,11 +236,11 @@ details summary{cursor:pointer;color:var(--mute);font-size:13px}
   </div></div>
   <div class="caps" id="caps"></div>
   <div class="ctrls">
-    <button class="cb" id="muteBtn" onclick="toggleMute()">🎙️<small>음소거</small></button>
-    <button class="cb" onclick="sos()">🆘<small>막혔어요</small></button>
-    <button class="cb hang" onclick="hangUp()">✕</button>
-    <button class="cb" onclick="slower()">🐢<small>천천히</small></button>
-    <button class="cb" id="capBtn" onclick="toggleCaps()">💬<small>자막</small></button>
+    <button class="cb" id="muteBtn">🎙️<small>음소거</small></button>
+    <button class="cb" id="sosBtn">🆘<small>막혔어요</small></button>
+    <button class="cb hang" id="hangBtn" aria-label="통화 종료">✕</button>
+    <button class="cb" id="slowBtn">🐢<small>천천히</small></button>
+    <button class="cb" id="capBtn">💬<small>자막</small></button>
   </div>
   <div style="height:24px"></div>
 </section>
@@ -184,10 +248,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:13px}
 <!-- REPORT -->
 <section class="screen" id="report">
   <div class="wrap">
-    <div class="top">
-      <div class="logo">통화 리포트</div>
-      <button class="iconbtn" onclick="go('home')">🏠</button>
-    </div>
+    <div class="top"><div class="logo">통화 리포트</div><button class="iconbtn" data-go="home">🏠</button></div>
     <div id="reportBody"></div>
   </div>
 </section>
@@ -195,25 +256,31 @@ details summary{cursor:pointer;color:var(--mute);font-size:13px}
 <!-- HISTORY -->
 <section class="screen" id="history">
   <div class="wrap">
-    <div class="top">
-      <div class="logo">통화 기록</div>
-      <button class="iconbtn" onclick="go('home')">🏠</button>
-    </div>
+    <div class="top"><div class="logo">통화 기록</div><button class="iconbtn" data-go="home">🏠</button></div>
     <div class="card" id="histList"></div>
+  </div>
+</section>
+
+<!-- ADMIN -->
+<section class="screen" id="admin">
+  <div class="wrap">
+    <div class="top"><div class="logo">사용자 관리</div><button class="iconbtn" data-go="home">🏠</button></div>
+    <div class="card" id="adminList"><div class="loading"><div class="spin"></div></div></div>
+    <p class="note">승인 = 테스터(영어·Jamie·최대 5분·하루 3회). 마스터 지정/해제는 보안상 SQL에서만 할 수 있어요.</p>
   </div>
 </section>
 
 <!-- SETTINGS -->
 <section class="screen" id="settings">
   <div class="wrap">
-    <div class="top">
-      <div class="logo">설정</div>
-      <button class="iconbtn" onclick="saveSettings()">✅</button>
-    </div>
+    <div class="top"><div class="logo">설정</div><button class="iconbtn" id="saveTop">✅</button></div>
     <div class="card">
-      <div class="h">Gemini API 키 (무료)</div>
-      <input id="sKey" type="password" placeholder="AIza..." autocomplete="off">
-      <p class="note">키는 이 기기 브라우저에만 저장돼요. 발급: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a><br>⚠️ 무료 등급에서는 Google이 대화 데이터를 서비스 개선에 쓸 수 있어요. 민감한 개인정보는 말하지 않는 걸 추천해요.</p>
+      <div class="h">계정</div>
+      <div class="note" id="acctInfo"></div>
+      <div style="height:10px"></div>
+      <button class="btn" id="syncBtn">지금 동기화</button>
+      <div style="height:8px"></div>
+      <button class="btn" data-act="logout">로그아웃</button>
     </div>
     <div class="card">
       <div class="h">배울 언어</div>
@@ -225,42 +292,54 @@ details summary{cursor:pointer;color:var(--mute);font-size:13px}
     </div>
     <div class="card">
       <div class="h">대화 호흡</div>
-      <label style="margin-top:0">상대가 끼어드는 타이밍</label>
+      <label style="margin-top:0" for="sVad">상대가 끼어드는 타이밍</label>
       <select id="sVad">
         <option value="relaxed">여유롭게 — 내가 생각할 시간을 길게 줘</option>
         <option value="normal">보통 — 친구랑 통화하듯</option>
         <option value="snappy">빠르게 — 잠깐만 멈춰도 바로 치고 들어와</option>
       </select>
     </div>
-    <div class="card">
+    <div class="card" id="advCard" style="display:none">
       <details>
-        <summary>고급 설정 (모델)</summary>
-        <label>실시간 음성 모델</label>
-        <select id="sLive">
-          <option value="gemini-3.1-flash-live-preview">gemini-3.1-flash-live-preview (최신, 추천)</option>
-          <option value="gemini-2.5-flash-native-audio-preview-12-2025">gemini-2.5-flash-native-audio-preview-12-2025</option>
-        </select>
-        <label>피드백 리포트 모델</label>
-        <input id="sText" placeholder="gemini-flash-latest">
-        <p class="note">모델 이름이 바뀌어 연결이 안 되면 여기서 바꾸면 돼요.</p>
+        <summary>고급 설정 (모델) · 마스터 전용</summary>
+        <label for="sLive">실시간 음성 모델</label>
+        <select id="sLive"></select>
+        <label for="sText">피드백 리포트 모델</label>
+        <input id="sText" placeholder="gemini-flash-latest" maxlength="64">
       </details>
     </div>
-    <button class="btn pri" onclick="saveSettings()">저장</button>
+    <button class="btn pri" id="saveBtn">저장</button>
     <div style="height:10px"></div>
-    <button class="btn" onclick="exportData()">기록 백업 복사하기 (JSON)</button>
+    <button class="btn" id="exportBtn">기록 백업 복사하기 (JSON)</button>
+    <div style="height:10px"></div>
+    <details class="card"><summary>예전 기록 가져오기 (백업 붙여넣기)</summary>
+      <textarea id="importTxt" rows="5" maxlength="2000000" placeholder="이전 버전에서 복사한 백업 JSON을 붙여넣으세요" style="margin-top:10px"></textarea>
+      <div style="height:10px"></div>
+      <button class="btn" id="importBtn">가져오기</button>
+    </details>
   </div>
 </section>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.1/dist/umd/supabase.js" integrity="sha384-2DeuFKyqIlpZfFmj+jl/+IbM3DwDM4vGKsvK0fI32E0ZDt24W33hB6pka4RAdbz2" crossorigin="anonymous"></script>
 <script>
+'use strict';
 /* =========================================================
-   Ringo — 사람 같은 외국어 통화 연습 (Gemini Live API, free tier)
-   한 파일짜리 웹앱. 서버 없음. 키/기록은 브라우저 localStorage.
+   Ringo — 사람 같은 외국어 통화 연습
+   - Gemini 키는 서버(Supabase Edge Function)에만 있음. 브라우저는 통화 1회용 임시 토큰만 받음.
+   - 역할: master(부부) / tester / pending / blocked — 제한은 서버가 강제, 화면은 안내용.
    ========================================================= */
+if (window.top !== window.self) { document.documentElement.style.display = 'none'; try { window.top.location = window.self.location; } catch (e) {} }
 
-const WS_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
-const REST = 'https://generativelanguage.googleapis.com/v1beta/models/';
+const SUPABASE_URL = 'https://bhwmxanakzrkqtdghyvo.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Wkdr6hBOZskHqiu2mFsigQ_Y-bU_qiC';   // publishable key (공개돼도 되는 키 — 데이터는 RLS로 보호)
+const API_URL = SUPABASE_URL + '/functions/v1/ringo-api';
+const WS_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained';
+const ALL_DURATIONS = [1, 3, 5, 10, 15, 20, 30, 60];
+const LIVE_MODEL_LABELS = {
+  'gemini-3.1-flash-live-preview': 'gemini-3.1-flash-live-preview (최신, 추천)',
+  'gemini-2.5-flash-native-audio-preview-12-2025': 'gemini-2.5-flash-native-audio-preview-12-2025',
+};
 
-/* ---------- 언어 & 통화 상대 (언어 확장은 여기만 추가하면 됨) ---------- */
 const LANGS = {
   en: {
     label: '🇺🇸 English', name: 'English',
@@ -373,82 +452,185 @@ const LEVELS = {
   advanced: {ko:'고급', en:'advanced (C1). Talk at full native speed with slang, idioms, jokes and cultural references, like you would with any friend.'},
 };
 
-const VAD = {
-  relaxed: {silence: 1100, end: 'END_SENSITIVITY_LOW'},
-  normal:  {silence: 650,  end: 'END_SENSITIVITY_LOW'},
-  snappy:  {silence: 320,  end: 'END_SENSITIVITY_HIGH'},
-};
+const VAD = { relaxed:1, normal:1, snappy:1 };  // 실제 값은 서버가 적용
 
-/* ---------- 저장소 ---------- */
-const STORE_KEY = 'ringo.v1';
+
+/* ---------- 상태 ---------- */
+const STORE_KEY = 'ringo.v2';
 const DEFAULT = {
-  apiKey:'', lang:'en', liveModel:'gemini-3.1-flash-live-preview', textModel:'gemini-flash-latest', vad:'normal',
+  lang:'en', liveModel:'gemini-3.1-flash-live-preview', textModel:'gemini-flash-latest', vad:'normal',
   profiles:[
     {id:'p1', name:'영범', level:'intermediate', interests:'클라우드/DevOps 일, 사이드 프로젝트, 여행'},
     {id:'p2', name:'보미', level:'intermediate', interests:'광고/미디어 일, 패션·뷰티, 블로그'},
   ],
-  sel:{profile:'p1', partner:'jamie', mode:'topic', role:0, dur:10, caps:'0'},
-  history:[],
+  sel:{profile:'p1', partner:'jamie', mode:'topic', role:0, dur:5, caps:'0', topicShift:0},
+  history:[], updatedAt:0, owner:null,
 };
-let S = load();
-function load(){
-  try{ const raw = localStorage.getItem(STORE_KEY); if(raw){ const o = JSON.parse(raw); return Object.assign(structuredClone(DEFAULT), o, {sel:Object.assign({}, DEFAULT.sel, o.sel||{})}); } }catch(e){}
+let S = loadLocal();
+let ME = null;        // {role, email, limits}
+let sb = null, user = null, pushTimer = 0, pulling = false;
+
+function loadLocal(){
+  try{ const raw = localStorage.getItem(STORE_KEY); if(raw) return sanitizeState(JSON.parse(raw)); }catch(e){}
   return structuredClone(DEFAULT);
 }
-function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){ toast('저장 공간이 부족해요. 오래된 기록을 정리해 주세요.'); } }
+function localSave(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){ toast('저장 공간이 부족해요.'); } }
+function save(){ S.updatedAt = Date.now(); localSave(); queueSettingsPush(); }
+
+/* ---------- 입력값 정리 (클라우드/백업에서 온 데이터도 믿지 않음) ---------- */
+const str = (v, n) => (typeof v === 'string' ? v : '').slice(0, n);
+const ID_RE = /^[a-z0-9]{6,20}$/;
+function sanitizeProfile(p, i){
+  return { id: ['p1','p2','p3'].includes(p?.id) ? p.id : 'p' + (i + 1),
+           name: str(p?.name, 20).trim() || '나', level: LEVELS[p?.level] ? p.level : 'intermediate',
+           interests: str(p?.interests, 120) };
+}
+function sanitizeRecord(h){
+  if(!h || typeof h !== 'object' || !ID_RE.test(String(h.id))) return null;
+  return {
+    id:h.id, ts:Number(h.ts)||0, day:str(h.day,10), profileId:str(h.profileId,8), lang:LANGS[h.lang]?h.lang:'en',
+    partnerId:str(h.partnerId,20), partnerName:str(h.partnerName,30), mode:str(h.mode,10), topic:str(h.topic,200),
+    secs:Math.max(0, Math.min(7200, Number(h.secs)||0)), sessionId:str(h.sessionId,40),
+    transcript:(Array.isArray(h.transcript)?h.transcript:[]).slice(0,400).map(t=>({role:t?.role==='user'?'user':'ai', text:str(t?.text,4000)})),
+    report:h.report && typeof h.report === 'object' ? h.report : null,
+  };
+}
+function sanitizeState(o){
+  const d = structuredClone(DEFAULT);
+  if(!o || typeof o !== 'object') return d;
+  d.lang = LANGS[o.lang] ? o.lang : 'en';
+  d.liveModel = LIVE_MODEL_LABELS[o.liveModel] ? o.liveModel : d.liveModel;
+  d.textModel = /^gemini-[a-z0-9.\-]{1,60}$/.test(o.textModel||'') ? o.textModel : d.textModel;
+  d.vad = VAD[o.vad] ? o.vad : 'normal';
+  if(Array.isArray(o.profiles) && o.profiles.length) d.profiles = o.profiles.slice(0,2).map(sanitizeProfile);
+  const s = o.sel || {};
+  d.sel = { profile: ['p1','p2','both'].includes(s.profile) ? s.profile : 'p1', partner: str(s.partner,20) || 'jamie',
+            mode: ['free','topic','role'].includes(s.mode) ? s.mode : 'topic', role: Math.max(0, Math.min(ROLEPLAYS.length-1, Number(s.role)||0)),
+            dur: ALL_DURATIONS.includes(Number(s.dur)) ? Number(s.dur) : 5, caps: s.caps === '1' ? '1' : '0', topicShift: Number(s.topicShift)||0 };
+  d.history = (Array.isArray(o.history)?o.history:[]).map(sanitizeRecord).filter(Boolean).slice(-200);
+  d.updatedAt = Number(o.updatedAt)||0;
+  d.owner = typeof o.owner === 'string' ? o.owner : null;
+  return d;
+}
 
 /* ---------- 유틸 ---------- */
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rich = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*\*/g, '');
 function toast(msg, ms=2600){ const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display='none', ms); }
 function dayKey(d=new Date()){ const z=new Date(d.getTime()-d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); }
 function dayIndex(){ return Math.floor(Date.now()/86400000); }
-function go(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on')); $(id).classList.add('on'); window.scrollTo(0,0);
-  if(id==='home') renderHome(); if(id==='settings') renderSettings(); if(id==='history') renderHistory(); }
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on')); $(id).classList.add('on'); window.scrollTo(0,0);
+  if(id==='home') renderHome(); if(id==='settings') renderSettings(); if(id==='history') renderHistory(); if(id==='admin') renderAdmin();
+}
+const isMaster = () => ME?.role === 'master';
+const lim = () => ME?.limits || {dailyMax:3, dailyUsed:0, durations:[1,3,5], langs:['en'], partners:['jamie'], canChangeModel:false, canCouple:false, liveModels:[]};
+const allowDur = d => lim().durations.includes(d);
+const allowLang = l => lim().langs.includes(l);
+const allowPartner = id => lim().partners.includes(id);
 function lang(){ return LANGS[S.lang] || LANGS.en; }
 function partner(){ const L=lang(); return L.partners.find(p=>p.id===S.sel.partner) || L.partners[0]; }
-function isCouple(){ return S.sel.profile==='both'; }
+function isCouple(){ return S.sel.profile==='both' && lim().canCouple; }
 function learners(){ return isCouple() ? S.profiles : [S.profiles.find(p=>p.id===S.sel.profile) || S.profiles[0]]; }
 function todayTopic(){ const off = S.profiles.findIndex(p=>p.id===S.sel.profile); return TOPICS[(dayIndex() + Math.max(0,off)*7 + (S.sel.topicShift||0)) % TOPICS.length]; }
+const PAY = '💳 결제 필요';
+
+// 역할에 맞게 선택값을 강제로 맞춤 (서버도 같은 규칙으로 막음)
+function enforceLimits(){
+  if(!allowLang(S.lang)) S.lang = lim().langs[0] || 'en';
+  if(!LANGS[S.lang].partners.some(p=>p.id===S.sel.partner) || !allowPartner(S.sel.partner)){
+    S.sel.partner = (LANGS[S.lang].partners.find(p=>allowPartner(p.id)) || LANGS[S.lang].partners[0]).id;
+  }
+  if(!allowDur(S.sel.dur)) S.sel.dur = Math.max(...lim().durations.filter(d=>d<=S.sel.dur), lim().durations[0]);
+  if(S.sel.profile==='both' && !lim().canCouple) S.sel.profile = 'p1';
+  if(!isMaster()){ S.liveModel = DEFAULT.liveModel; S.textModel = DEFAULT.textModel; }
+}
+
+/* ---------- 서버 호출 ---------- */
+const ERR_KO = {
+  daily_limit: '오늘 무료 통화 3회를 다 썼어요 · 💳 결제 필요',
+  duration_locked: '그 통화 시간은 💳 결제가 필요해요', lang_locked: '그 언어는 💳 결제가 필요해요', partner_locked: '그 통화 상대는 💳 결제가 필요해요',
+  too_fast: '잠깐만요! 몇 초 뒤에 다시 걸어주세요', pending: '아직 승인 대기 중이에요', blocked: '이용이 제한된 계정이에요',
+  server_key_missing: '서버에 Gemini 키가 아직 설정되지 않았어요 (관리자 확인 필요)', token_failed: '통화 연결 토큰을 받지 못했어요. 잠시 후 다시 시도해 주세요',
+  report_failed: '리포트를 만들지 못했어요', already_reported: '이미 리포트가 만들어진 통화예요', session_expired: '오래된 통화라 리포트를 만들 수 없어요',
+  no_session: '로그인이 필요해요', invalid_session: '로그인이 만료됐어요. 다시 로그인해 주세요', transcript_too_short: '대화가 너무 짧아요',
+};
+const errMsg = e => ERR_KO[e?.code] || ('문제가 생겼어요 (' + (e?.code || e?.message || 'unknown') + ')');
+async function api(action, payload={}){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ const e = new Error('no_session'); e.code='no_session'; throw e; }
+  const r = await fetch(API_URL, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SUPABASE_KEY, Authorization:'Bearer ' + session.access_token },
+                                   body: JSON.stringify({ action, ...payload }) });
+  let j = {}; try{ j = await r.json(); }catch(e){}
+  if(!r.ok){ const e = new Error(j.error || ('http_' + r.status)); e.code = j.error || ('http_' + r.status); e.status = r.status; throw e; }
+  return j;
+}
 
 /* ---------- 홈 ---------- */
 function renderHome(){
-  $('keyWarn').style.display = S.apiKey ? 'none' : 'block';
+  enforceLimits();
+  $('adminBtn').style.display = isMaster() ? '' : 'none';
+  const L = lim();
+  // tester usage
+  const tester = !isMaster();
+  $('testerCard').style.display = tester ? '' : 'none';
+  const used = L.dailyUsed || 0, max = L.dailyMax;
+  if(tester){
+    $('usageText').textContent = `오늘 무료 통화 ${Math.min(used, max)}/${max}`;
+    $('usageNote').textContent = used >= max ? `오늘 무료 통화를 다 썼어요. 더 하려면 ${PAY}` : '테스터는 Jamie와 영어로, 한 번에 최대 5분까지 무료로 통화할 수 있어요.';
+  }
+  const btn = $('callBtn');
+  const out = tester && max !== null && used >= max;
+  btn.disabled = out; btn.textContent = out ? `${PAY} · 오늘 무료 통화 끝` : '📞 전화 걸기';
+
   // profiles
-  const pc = $('profileChips'); pc.innerHTML='';
-  [...S.profiles.map(p=>({id:p.id, label:'🙋 '+p.name})), {id:'both', label:'💑 같이 통화'}].forEach(p=>{
-    const b=document.createElement('button'); b.className='chip'+(S.sel.profile===p.id?' on':''); b.textContent=p.label;
-    b.onclick=()=>{S.sel.profile=p.id; save(); renderHome();}; pc.appendChild(b);
-  });
+  const pc = $('profileChips'); pc.textContent = '';
+  const list = (isMaster() ? S.profiles : S.profiles.slice(0,1)).map(p=>({id:p.id, label:'🙋 '+p.name}));
+  if(lim().canCouple) list.push({id:'both', label:'💑 같이 통화'});
+  list.forEach(p=>{ const b=document.createElement('button'); b.className='chip'+(S.sel.profile===p.id?' on':''); b.textContent=p.label;
+    b.onclick=()=>{S.sel.profile=p.id; save(); renderHome();}; pc.appendChild(b); });
+  $('profileCard').style.display = list.length > 1 ? '' : 'none';
+
   // streak
   const st = streak(); $('streakNum').textContent = st.n;
   $('streakSub').textContent = st.today ? '오늘 통화 완료! 내일도 만나요 👋' : (st.n ? '오늘 통화하면 연속 기록 유지!' : '오늘 첫 통화를 해볼까요?');
-  const wd=$('weekDots'); wd.innerHTML='';
-  for(let i=6;i>=0;i--){ const k=dayKey(new Date(Date.now()-i*86400000)); const i_=document.createElement('i'); if(st.days.has(k)) i_.className='on'; wd.appendChild(i_); }
+  const wd=$('weekDots'); wd.textContent='';
+  for(let i=6;i>=0;i--){ const k=dayKey(new Date(Date.now()-i*86400000)); const el=document.createElement('i'); if(st.days.has(k)) el.className='on'; wd.appendChild(el); }
+
   // partners
-  const L = lang(); if(!L.partners.find(p=>p.id===S.sel.partner)) S.sel.partner = L.partners[0].id;
-  const g=$('partnerGrid'); g.innerHTML='';
-  L.partners.forEach(p=>{
-    const b=document.createElement('button'); b.className='pc'+(S.sel.partner===p.id?' on':'');
-    b.innerHTML=`<div class="em">${p.em}</div><b>${esc(p.name)}</b><small>${esc(p.tag)}</small>`;
-    b.onclick=()=>{S.sel.partner=p.id; save(); renderHome();}; g.appendChild(b);
+  const g=$('partnerGrid'); g.textContent='';
+  lang().partners.forEach(p=>{
+    const ok = allowPartner(p.id);
+    const b=document.createElement('button'); b.className='pc'+(S.sel.partner===p.id?' on':'')+(ok?'':' off');
+    b.innerHTML=`<div class="em">${esc(p.em)}</div><b>${esc(p.name)}</b><small>${esc(p.tag)}</small>${ok?'':`<span class="lock">${PAY}</span>`}`;
+    b.onclick=()=>{ if(!ok){ toast(`${p.name}와의 통화는 ${PAY}`); return; } S.sel.partner=p.id; save(); renderHome(); };
+    g.appendChild(b);
   });
+
   // modes
-  const mc=$('modeChips'); mc.innerHTML='';
+  const mc=$('modeChips'); mc.textContent='';
   MODES.forEach(m=>{ const b=document.createElement('button'); b.className='chip'+(S.sel.mode===m.id?' on':''); b.textContent=m.ko;
     b.onclick=()=>{S.sel.mode=m.id; save(); renderHome();}; mc.appendChild(b); });
-  const ex=$('modeExtra');
+  const ex=$('modeExtra'); ex.textContent='';
   if(S.sel.mode==='topic'){
-    ex.innerHTML=`<div class="topic">“${esc(todayTopic())}”<br><button class="re" onclick="S.sel.topicShift=(S.sel.topicShift||0)+1;save();renderHome()">🔄 다른 토픽</button></div>`;
+    const d=document.createElement('div'); d.className='topic'; d.textContent=`“${todayTopic()}”`;
+    const r=document.createElement('button'); r.className='re'; r.textContent='🔄 다른 토픽'; r.onclick=()=>{S.sel.topicShift=(S.sel.topicShift||0)+1; save(); renderHome();};
+    d.appendChild(document.createElement('br')); d.appendChild(r); ex.appendChild(d);
   } else if(S.sel.mode==='role'){
-    ex.innerHTML = `<select id="roleSel">${ROLEPLAYS.map((r,i)=>`<option value="${i}" ${+S.sel.role===i?'selected':''}>${esc(r.ko)}</option>`).join('')}</select>`;
-    $('roleSel').onchange = e => { S.sel.role = +e.target.value; save(); };
+    const sel=document.createElement('select');
+    ROLEPLAYS.forEach((r,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=r.ko; if(+S.sel.role===i) o.selected=true; sel.appendChild(o); });
+    sel.onchange=e=>{ S.sel.role=+e.target.value; save(); }; ex.appendChild(sel);
   } else {
-    ex.innerHTML = `<div class="note">상대가 먼저 “요즘 어때?” 하고 안부부터 물어볼 거예요. 지난 통화 내용도 기억하고 있어요.</div>`;
+    const d=document.createElement('div'); d.className='note'; d.textContent='상대가 먼저 “요즘 어때?” 하고 안부부터 물어볼 거예요. 지난 통화 내용도 기억하고 있어요.'; ex.appendChild(d);
   }
-  $('durSel').value = S.sel.dur; $('capSel').value = S.sel.caps;
-  $('durSel').onchange = e => { S.sel.dur = +e.target.value; save(); };
-  $('capSel').onchange = e => { S.sel.caps = e.target.value; save(); };
+
+  // durations
+  const ds=$('durSel'); ds.textContent='';
+  ALL_DURATIONS.forEach(d=>{ const o=document.createElement('option'); o.value=d; const ok=allowDur(d);
+    o.textContent = ok ? `${d}분` : `${d}분 · ${PAY}`; o.disabled = !ok; if(S.sel.dur===d) o.selected=true; ds.appendChild(o); });
+  ds.onchange=e=>{ const v=+e.target.value; if(!allowDur(v)){ toast(PAY); renderHome(); return; } S.sel.dur=v; save(); };
+  $('capSel').value = S.sel.caps; $('capSel').onchange=e=>{ S.sel.caps = e.target.value==='1'?'1':'0'; save(); };
 }
 function streak(){
   const ids = isCouple() ? S.profiles.map(p=>p.id).concat('both') : [S.sel.profile, 'both'];
@@ -461,25 +643,87 @@ function streak(){
 
 /* ---------- 설정 ---------- */
 function renderSettings(){
-  $('sKey').value = S.apiKey; $('sVad').value = S.vad; $('sLive').value = S.liveModel; $('sText').value = S.textModel;
-  $('sLang').innerHTML = Object.entries(LANGS).map(([k,v])=>`<option value="${k}" ${S.lang===k?'selected':''}>${v.label}</option>`).join('');
-  $('sProfiles').innerHTML = S.profiles.map((p,i)=>`
-    <div style="${i?'border-top:1px solid var(--line);margin-top:14px;padding-top:4px':''}">
-      <div class="row"><div><label>이름</label><input id="pn${i}" value="${esc(p.name)}"></div>
-      <div><label>레벨</label><select id="pl${i}">${Object.entries(LEVELS).map(([k,v])=>`<option value="${k}" ${p.level===k?'selected':''}>${v.ko}</option>`).join('')}</select></div></div>
-      <label>관심사 (대화 소재로 쓰여요)</label><input id="pi${i}" value="${esc(p.interests)}">
-    </div>`).join('');
+  $('acctInfo').textContent = user ? `${user.email} · ${({master:'마스터', tester:'테스터'})[ME?.role] || ME?.role || ''}` : '';
+  const sl=$('sLang'); sl.textContent='';
+  Object.entries(LANGS).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; const ok=allowLang(k);
+    o.textContent = ok ? v.label : `${v.label} · ${PAY}`; o.disabled=!ok; if(S.lang===k) o.selected=true; sl.appendChild(o); });
+  $('sVad').value = S.vad;
+  const box=$('sProfiles'); box.textContent='';
+  (isMaster() ? S.profiles : S.profiles.slice(0,1)).forEach((p,i)=>{
+    const w=document.createElement('div'); if(i) w.style.cssText='border-top:1px solid var(--line);margin-top:14px;padding-top:4px';
+    w.innerHTML=`<div class="row"><div><label for="pn${i}">이름</label><input id="pn${i}" maxlength="20"></div>
+      <div><label for="pl${i}">레벨</label><select id="pl${i}"></select></div></div>
+      <label for="pi${i}">관심사 (대화 소재로 쓰여요)</label><input id="pi${i}" maxlength="120">`;
+    box.appendChild(w);
+    $('pn'+i).value=p.name; $('pi'+i).value=p.interests;
+    Object.entries(LEVELS).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v.ko; if(p.level===k) o.selected=true; $('pl'+i).appendChild(o); });
+  });
+  $('advCard').style.display = isMaster() ? '' : 'none';
+  if(isMaster()){
+    const lv=$('sLive'); lv.textContent='';
+    (lim().liveModels||Object.keys(LIVE_MODEL_LABELS)).forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=LIVE_MODEL_LABELS[m]||m; if(S.liveModel===m) o.selected=true; lv.appendChild(o); });
+    $('sText').value = S.textModel;
+  }
 }
 function saveSettings(){
-  S.apiKey = $('sKey').value.trim(); S.vad = $('sVad').value; S.liveModel = $('sLive').value; S.textModel = $('sText').value.trim() || 'gemini-flash-latest';
-  S.lang = $('sLang').value;
-  S.profiles.forEach((p,i)=>{ p.name = $('pn'+i).value.trim()||p.name; p.level = $('pl'+i).value; p.interests = $('pi'+i).value.trim(); });
-  save(); toast('저장했어요 ✅'); go('home');
+  const nl = $('sLang').value; if(allowLang(nl)) S.lang = nl; else toast(PAY);
+  S.vad = VAD[$('sVad').value] ? $('sVad').value : 'normal';
+  (isMaster() ? S.profiles : S.profiles.slice(0,1)).forEach((p,i)=>{
+    p.name = str($('pn'+i).value, 20).trim() || p.name; p.level = LEVELS[$('pl'+i).value] ? $('pl'+i).value : p.level; p.interests = str($('pi'+i).value, 120).trim();
+  });
+  if(isMaster()){
+    if(LIVE_MODEL_LABELS[$('sLive').value]) S.liveModel = $('sLive').value;
+    const tm = $('sText').value.trim(); S.textModel = /^gemini-[a-z0-9.\-]{1,60}$/.test(tm) ? tm : DEFAULT.textModel;
+  }
+  enforceLimits(); save(); toast('저장했어요 ✅'); go('home');
 }
 function exportData(){
-  const txt = JSON.stringify({...S, apiKey:undefined}, null, 1);
+  const txt = JSON.stringify({...S, owner:undefined}, null, 1);
   navigator.clipboard?.writeText(txt).then(()=>toast('기록을 클립보드에 복사했어요')).catch(()=>toast('복사 실패 — 브라우저 권한을 확인해 주세요'));
 }
+function importData(){
+  let o; try{ o = JSON.parse($('importTxt').value); }catch(e){ toast('JSON 형식이 아니에요'); return; }
+  const incoming = sanitizeState(o);
+  const ids = new Set(S.history.map(h=>h.id));
+  const add = incoming.history.filter(h=>!ids.has(h.id));
+  S.history = [...S.history, ...add].sort((a,b)=>a.ts-b.ts).slice(-200);
+  if(isMaster() && Array.isArray(o.profiles) && o.profiles.length) S.profiles = incoming.profiles;
+  save(); add.forEach(h=>cloudPutCall(h));
+  $('importTxt').value=''; toast(`가져왔어요: 통화 ${add.length}건 추가`);
+}
+
+/* ---------- 관리자 ---------- */
+async function renderAdmin(){
+  const box=$('adminList');
+  if(!isMaster()){ box.textContent='권한이 없어요'; return; }
+  box.innerHTML='<div class="loading"><div class="spin"></div></div>';
+  const { data, error } = await sb.from('app_users').select('user_id,email,role,created_at').order('created_at',{ascending:false}).limit(300);
+  if(error){ box.textContent='불러오기 실패: ' + error.message; return; }
+  const label = {pending:'⏳ 대기', tester:'✅ 테스터', master:'👑 마스터', blocked:'⛔ 차단'};
+  box.innerHTML = data.length ? data.map(u=>{
+    const btns = u.role==='master' ? '' :
+      (u.role!=='tester' ? `<button class="mini pri" data-uid="${esc(u.user_id)}" data-role="tester">승인</button>` : `<button class="mini" data-uid="${esc(u.user_id)}" data-role="pending">대기로</button>`) +
+      (u.role!=='blocked' ? `<button class="mini bad" data-uid="${esc(u.user_id)}" data-role="blocked">차단</button>` : '') +
+      `<button class="mini" data-uid="${esc(u.user_id)}" data-key="1">전용 키</button>`;
+    return `<div class="adminrow"><div><b>${esc(u.email)}</b><br><small>${esc(label[u.role]||u.role)} · ${esc(String(u.created_at).slice(0,10))}</small></div><div class="abtns">${btns}</div></div>`;
+  }).join('') : '<div class="note">아직 가입자가 없어요.</div>';
+}
+async function setRole(uid, role){
+  const { error } = await sb.from('app_users').update({ role }).eq('user_id', uid);
+  if(error){ toast('변경 실패: ' + error.message, 4000); return; }
+  toast(role==='tester' ? '승인했어요 ✅' : role==='blocked' ? '차단했어요' : '대기로 바꿨어요'); renderAdmin();
+}
+async function setUserKey(uid){
+  const k = window.prompt('이 사용자 전용 Gemini API 키 (비우면 삭제 → 마스터 키 사용)', '');
+  if(k === null) return;
+  try{ const r = await api('admin_set_key', { userId: uid, key: k.trim() || null }); toast(r.hasKey ? '전용 키 저장 ✅ (화면에 다시 표시되지 않아요)' : '전용 키 삭제됨'); }
+  catch(e){ toast(e.code==='bad_key' ? '키 형식이 올바르지 않아요' : errMsg(e), 4000); }
+}
+$('adminList').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-uid]'); if(!b) return;
+  const uid = b.dataset.uid; if(!/^[0-9a-f-]{36}$/i.test(uid)) return;
+  if(b.dataset.key) setUserKey(uid); else if(['tester','pending','blocked'].includes(b.dataset.role)) setRole(uid, b.dataset.role);
+});
 
 /* ---------- 시스템 프롬프트 ---------- */
 function buildSystem(){
@@ -521,33 +765,44 @@ ${past ? `\nThings you remember from your previous calls with them (bring one up
 The call is starting now. You called them. Open like a real phone call (e.g. "Hey! Oh good, you picked up—"), in one or two short sentences.`;
 }
 
+
 /* =========================================================
-   통화 엔진 (Gemini Live API over WebSocket)
+   통화 엔진 (Gemini Live — 서버가 발급한 임시 토큰으로만 연결)
    ========================================================= */
-let C = null; // current call state
+let C = null;
 
 async function startCall(){
-  if(!S.apiKey){ toast('먼저 ⚙️ 설정에서 무료 API 키를 넣어주세요'); go('settings'); return; }
+  if(!ME || !['tester','master'].includes(ME.role)){ toast('승인된 계정만 통화할 수 있어요'); return; }
+  enforceLimits();
+  const L = lim();
+  if(L.dailyMax !== null && (L.dailyUsed||0) >= L.dailyMax){ toast(ERR_KO.daily_limit, 4000); return; }
   if(!navigator.mediaDevices?.getUserMedia){ toast('이 브라우저는 마이크를 지원하지 않아요 (https 주소로 열어주세요)'); return; }
   const P = partner();
   C = { ws:null, ctx:null, stream:null, node:null, src:null, inAn:null, outAn:null, sources:new Set(), nextTime:0,
-        ready:false, closing:false, muted:false, handle:null, reconnects:0, greeted:false,
+        ready:false, closing:false, muted:false, handle:null, reconnects:0, greeted:false, token:null, setup:null, sessionId:null,
         transcript:[], start:0, timerId:0, wrapSent:false, raf:0, wake:null, durSec:S.sel.dur*60, capsOn:S.sel.caps==='1' };
   $('cName').textContent = P.name; $('cSub').textContent = P.tag; $('cTimer').textContent='00:00';
-  $('caps').innerHTML=''; $('caps').classList.toggle('on', C.capsOn); $('capBtn').classList.toggle('on', C.capsOn);
+  $('caps').textContent=''; $('caps').classList.toggle('on', C.capsOn); $('capBtn').classList.toggle('on', C.capsOn);
   $('muteBtn').classList.remove('on'); setState('idle','전화 거는 중… 📞');
   go('call');
   try{
     C.ctx = new (window.AudioContext||window.webkitAudioContext)();
-    await C.ctx.resume();
+    const resumeP = C.ctx.resume();
     C.stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1}});
+    await resumeP;
     await setupMic();
     C.outAn = C.ctx.createAnalyser(); C.outAn.fftSize = 512; C.outAn.connect(C.ctx.destination);
     try{ C.wake = await navigator.wakeLock?.request('screen'); }catch(e){}
+    const t = await api('token', { lang:S.lang, partner:P.id, minutes:S.sel.dur, model:S.liveModel, vad:S.vad, system:buildSystem() });
+    if(!C) return;
+    C.token = t.token; C.setup = t.setup; C.sessionId = t.sessionId; C.durSec = t.minutes*60;
+    ME.limits.dailyUsed = t.dailyUsed;
     openSocket(null);
     animate();
   }catch(e){
-    console.error(e); toast('마이크 권한이 필요해요: '+(e.message||e)); cleanup(); C = null; go('home');
+    console.warn(e);
+    toast(e?.name==='NotAllowedError' ? '마이크 권한이 필요해요' : errMsg(e), 4500);
+    cleanup(); C = null; go('home');
   }
 }
 
@@ -574,7 +829,7 @@ async function setupMic(){
   C.src = C.ctx.createMediaStreamSource(C.stream);
   C.inAn = C.ctx.createAnalyser(); C.inAn.fftSize = 512;
   C.src.connect(C.inAn);
-  const g = C.ctx.createGain(); g.gain.value = 0; g.connect(C.ctx.destination); // node must be pulled
+  const g = C.ctx.createGain(); g.gain.value = 0; g.connect(C.ctx.destination);
   const send = buf => {
     if(!C || !C.ready || C.muted || C.ws?.readyState!==1) return;
     C.ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(buf), mimeType:'audio/pcm;rate=16000'}}}));
@@ -582,19 +837,17 @@ async function setupMic(){
   try{
     if(!C.ctx.audioWorklet) throw new Error('no worklet');
     const url = URL.createObjectURL(new Blob([code], {type:'application/javascript'}));
-    await C.ctx.audioWorklet.addModule(url);
+    await C.ctx.audioWorklet.addModule(url); URL.revokeObjectURL(url);
     C.node = new AudioWorkletNode(C.ctx, 'ringo-cap');
     C.node.port.onmessage = e => send(e.data);
   }catch(err){
-    // fallback (e.g. opened as a local file): ScriptProcessor + same downsampling
-    console.warn('worklet unavailable, using ScriptProcessor', err);
-    const ratio = C.ctx.sampleRate/16000; let pos=0, sum=0, cnt=0, n=0, out=new Int16Array(1600);
+    const ratio = C.ctx.sampleRate/16000; let pos=0, sum=0, cnt=0, n=0; const out=new Int16Array(1600);
     C.node = C.ctx.createScriptProcessor(4096, 1, 1);
     C.node.onaudioprocess = e => {
       const ch = e.inputBuffer.getChannelData(0);
       for(let i=0;i<ch.length;i++){
         sum += ch[i]; cnt++; pos += 1;
-        if(pos >= ratio){ pos -= ratio; let v = Math.max(-1, Math.min(1, sum/cnt)); sum=0; cnt=0;
+        if(pos >= ratio){ pos -= ratio; const v = Math.max(-1, Math.min(1, sum/cnt)); sum=0; cnt=0;
           out[n++] = v<0 ? v*0x8000 : v*0x7fff;
           if(n === out.length){ send(out.buffer.slice(0)); n=0; } }
       }
@@ -604,50 +857,29 @@ async function setupMic(){
 }
 
 function openSocket(handle){
-  const v = VAD[S.vad] || VAD.normal;
-  const ws = new WebSocket(`${WS_URL}?key=${encodeURIComponent(S.apiKey)}`);
+  const ws = new WebSocket(`${WS_URL}?access_token=${encodeURIComponent(C.token)}`);
   ws.binaryType = 'arraybuffer';
   C.ws = ws; C.ready = false;
   ws.onopen = () => {
-    ws.send(JSON.stringify({setup:{
-      model: 'models/' + S.liveModel,
-      generationConfig: {
-        responseModalities: ['AUDIO'],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: partner().voice } } },
-        temperature: 1.0,
-      },
-      systemInstruction: { parts: [{ text: buildSystem() }] },
-      realtimeInputConfig: { automaticActivityDetection: {
-        startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
-        endOfSpeechSensitivity: v.end, prefixPaddingMs: 40, silenceDurationMs: v.silence } },
-      inputAudioTranscription: {}, outputAudioTranscription: {},
-      contextWindowCompression: { slidingWindow: {} },
-      sessionResumption: handle ? { handle } : {},
-    }}));
+    const setup = JSON.parse(JSON.stringify(C.setup));
+    setup.sessionResumption = handle ? { handle } : {};
+    ws.send(JSON.stringify({ setup }));
   };
-  ws.onmessage = async ev => {
-    let txt = typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data);
+  ws.onmessage = ev => {
+    const txt = typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data);
     let m; try{ m = JSON.parse(txt); }catch(e){ return; }
     onServer(m);
   };
-  ws.onerror = e => console.warn('ws error', e);
   ws.onclose = e => {
-    if(!C || ws !== C.ws) return;
-    if(C.closing) return;
-    console.warn('ws closed', e.code, e.reason);
+    if(!C || ws !== C.ws || C.closing) return;
+    const elapsed = C.start ? (Date.now()-C.start)/1000 : 0;
+    if(elapsed >= C.durSec - 5){ hangUp(); return; }            // 서버가 정한 통화 시간 종료
     if(C.handle && C.reconnects < 3 && C.greeted){ C.reconnects++; setState('idle','잠깐 신호가 끊겼어요… 다시 연결 중'); openSocket(C.handle); return; }
-    const reason = e.reason || `연결 종료 (code ${e.code})`;
-    toast('연결이 끊겼어요: ' + reason, 6000);
+    toast('연결이 끊겼어요' + (e.reason ? ': ' + e.reason.slice(0,120) : ''), 6000);
     hangUp(true);
   };
 }
-
-function reconnect(){
-  if(!C || !C.handle) return;
-  const old = C.ws; C.ws = null;
-  try{ old.onclose = null; old.close(); }catch(e){}
-  openSocket(C.handle);
-}
+function reconnect(){ if(!C || !C.handle) return; const old = C.ws; C.ws = null; try{ old.onclose = null; old.close(); }catch(e){} openSocket(C.handle); }
 
 function onServer(m){
   if(!C) return;
@@ -657,28 +889,27 @@ function onServer(m){
       C.greeted = true; C.start = Date.now(); C.timerId = setInterval(tick, 500);
       $('cSub').textContent = '통화 중'; setState('speak','');
       sendText('(App note: the call just connected. Say hello now.)');
-    } else { setState('listen','다시 연결됐어요'); }
+    } else setState('listen','다시 연결됐어요');
     return;
   }
-  if(m.sessionResumptionUpdate){ if(m.sessionResumptionUpdate.resumable && m.sessionResumptionUpdate.newHandle) C.handle = m.sessionResumptionUpdate.newHandle; }
+  if(m.sessionResumptionUpdate?.resumable && typeof m.sessionResumptionUpdate.newHandle === 'string') C.handle = m.sessionResumptionUpdate.newHandle;
   if(m.goAway){ reconnect(); return; }
   const sc = m.serverContent; if(!sc) return;
-  if(sc.interrupted){ flushAudio(); }
-  if(sc.modelTurn?.parts){
+  if(sc.interrupted) flushAudio();
+  if(Array.isArray(sc.modelTurn?.parts)){
     for(const p of sc.modelTurn.parts){
-      if(p.inlineData?.data && (p.inlineData.mimeType||'').startsWith('audio')) playPCM(p.inlineData.data, p.inlineData.mimeType);
+      if(typeof p.inlineData?.data === 'string' && String(p.inlineData.mimeType||'').startsWith('audio')) playPCM(p.inlineData.data, p.inlineData.mimeType);
     }
   }
-  if(sc.inputTranscription?.text) addCap('user', sc.inputTranscription.text);
-  if(sc.outputTranscription?.text) addCap('ai', sc.outputTranscription.text);
+  if(typeof sc.inputTranscription?.text === 'string') addCap('user', sc.inputTranscription.text);
+  if(typeof sc.outputTranscription?.text === 'string') addCap('ai', sc.outputTranscription.text);
 }
-
 function sendText(t){ if(C?.ws?.readyState===1) C.ws.send(JSON.stringify({realtimeInput:{text:t}})); }
 
-/* ---- audio out ---- */
 function playPCM(data, mime){
-  const rate = +(/rate=(\d+)/.exec(mime||'')?.[1] || 24000);
-  const bin = atob(data); const len = bin.length >> 1;
+  const rate = Math.min(48000, Math.max(8000, +(/rate=(\d+)/.exec(mime||'')?.[1] || 24000)));
+  let bin; try{ bin = atob(data); }catch(e){ return; }
+  const len = bin.length >> 1; if(!len) return;
   const f = new Float32Array(len);
   for(let i=0;i<len;i++){ let s = bin.charCodeAt(2*i) | (bin.charCodeAt(2*i+1)<<8); if(s>=0x8000) s -= 0x10000; f[i] = s/32768; }
   const buf = C.ctx.createBuffer(1, len, rate); buf.copyToChannel(f, 0);
@@ -688,13 +919,12 @@ function playPCM(data, mime){
   C.sources.add(src); src.onended = () => C?.sources.delete(src);
 }
 function flushAudio(){ if(!C) return; C.sources.forEach(s=>{ try{s.stop();}catch(e){} }); C.sources.clear(); C.nextTime = 0; }
-function aiSpeaking(){ return C && C.nextTime > C.ctx.currentTime + 0.01; }
+function aiSpeaking(){ return C && C.ctx && C.nextTime > C.ctx.currentTime + 0.01; }
 
-/* ---- captions/transcript ---- */
 function addCap(role, text){
   const T = C.transcript; let last = T[T.length-1];
-  if(!last || last.role !== role){ last = {role, text:''}; T.push(last); }
-  last.text += text;
+  if(!last || last.role !== role){ if(T.length >= 400) return; last = {role, text:''}; T.push(last); }
+  if(last.text.length < 4000) last.text += text;
   if(C.capsOn) renderCaps();
 }
 function renderCaps(){
@@ -703,8 +933,6 @@ function renderCaps(){
   $('caps').scrollTop = 1e9;
 }
 function toggleCaps(){ C.capsOn = !C.capsOn; $('caps').classList.toggle('on', C.capsOn); $('capBtn').classList.toggle('on', C.capsOn); if(C.capsOn) renderCaps(); }
-
-/* ---- controls ---- */
 function toggleMute(){
   C.muted = !C.muted; $('muteBtn').classList.toggle('on', C.muted);
   if(C.muted && C.ws?.readyState===1) C.ws.send(JSON.stringify({realtimeInput:{audioStreamEnd:true}}));
@@ -712,17 +940,16 @@ function toggleMute(){
 }
 function sos(){ sendText('(App note: the learner pressed the "I\'m stuck" button. In a natural, friendly way, help them out: suggest one or two simple phrases they could say right now, then hand the turn back to them.)'); toast('도움 요청했어요 🆘', 1200); }
 function slower(){ sendText('(App note: the learner asked you to speak a bit slower and with simpler words for a while. Do it naturally, without mentioning it much.)'); toast('천천히 말해달라고 했어요 🐢', 1200); }
-
 function setState(kind, text){ const o=$('orb'); o.className = 'orb ' + (kind==='speak'?'':kind); if(text!=null) $('cState').textContent = text; }
 
 function tick(){
   if(!C) return;
-  const s = Math.floor((Date.now()-C.start)/1000);
-  $('cTimer').textContent = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')} / ${S.sel.dur}:00`;
-  if(!C.wrapSent && s >= C.durSec - 40){ C.wrapSent = true; sendText('(App note: about 40 seconds of call time left. Start wrapping up naturally and say goodbye within your next turn or two — maybe mention something to talk about next time.)'); }
-  if(s >= C.durSec + 30 && !aiSpeaking()) hangUp();
+  const s = Math.floor((Date.now()-C.start)/1000), D = C.durSec;
+  $('cTimer').textContent = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')} / ${Math.round(D/60)}:00`;
+  const wrapAt = D - Math.min(40, Math.round(D*0.25));
+  if(!C.wrapSent && s >= wrapAt){ C.wrapSent = true; sendText('(App note: the call is almost over. Start wrapping up naturally and say goodbye within your next turn or two — maybe mention something to talk about next time.)'); }
+  if(s >= D + 30 && !aiSpeaking()) hangUp();
 }
-
 function animate(){
   const a = new Uint8Array(256);
   const loop = () => {
@@ -736,7 +963,6 @@ function animate(){
   loop();
 }
 function rms(a){ let s=0; for(let i=0;i<a.length;i++){ const v=(a[i]-128)/128; s+=v*v; } return Math.sqrt(s/a.length); }
-
 function cleanup(){
   if(!C) return;
   C.closing = true;
@@ -746,115 +972,221 @@ function cleanup(){
   try{ C.stream?.getTracks().forEach(t=>t.stop()); }catch(e){}
   try{ C.ctx?.close(); }catch(e){}
   try{ C.wake?.release(); }catch(e){}
+  C.token = null;
 }
-
 function hangUp(failed){
   if(!C || C.closing) return;
   const call = C; cleanup(); C = null;
+  renderHome();
   const secs = call.start ? Math.floor((Date.now()-call.start)/1000) : 0;
   const userChars = call.transcript.filter(t=>t.role==='user').reduce((n,t)=>n+t.text.trim().length, 0);
   if(secs < 20 || userChars < 15){ if(!failed) toast('통화가 너무 짧아서 리포트는 건너뛸게요'); go('home'); return; }
   const P = partner();
-  const rec = { id: Date.now().toString(36), day: dayKey(), ts: Date.now(), profileId: S.sel.profile, lang: S.lang,
-    partnerId: P.id, partnerName: P.name, mode: S.sel.mode,
+  const rec = sanitizeRecord({ id: Date.now().toString(36), day: dayKey(), ts: Date.now(), profileId: S.sel.profile, lang: S.lang,
+    partnerId: P.id, partnerName: P.name, mode: S.sel.mode, sessionId: call.sessionId,
     topic: S.sel.mode==='topic' ? todayTopic() : S.sel.mode==='role' ? ROLEPLAYS[S.sel.role]?.ko : '자유 수다',
-    secs, transcript: call.transcript.map(t=>({role:t.role, text:t.text.trim()})), report:null };
-  S.history.push(rec); if(S.history.length > 80) S.history = S.history.slice(-80); save();
+    secs, transcript: call.transcript.map(t=>({role:t.role, text:t.text.trim()})), report:null });
+  S.history.push(rec); S.history = S.history.slice(-200); save(); cloudPutCall(rec);
   showReport(rec, true);
 }
 
-/* =========================================================
-   통화 후 피드백 리포트
-   ========================================================= */
+/* ---------- 리포트 (서버가 만듦) ---------- */
 async function makeReport(rec){
-  const L = LANGS[rec.lang] || LANGS.en;
-  const names = rec.profileId==='both' ? S.profiles.map(p=>p.name).join(' & ') : (S.profiles.find(p=>p.id===rec.profileId)?.name || 'learner');
-  const level = rec.profileId==='both' ? 'mixed' : (LEVELS[S.profiles.find(p=>p.id===rec.profileId)?.level]?.ko || '중급');
-  const tx = rec.transcript.map(t=>`${t.role==='user'?'LEARNER':rec.partnerName.toUpperCase()}: ${t.text}`).join('\n');
-  const prompt = `You are a warm, sharp ${L.name} coach for Korean learners. Below is a speech-to-text transcript of a casual phone call between the learner(s) "${names}" (level: ${level}) and a native-speaker friend "${rec.partnerName}". The transcript may contain speech-recognition glitches — ignore errors that are obviously transcription artifacts, focus on real language issues.
-
-TRANSCRIPT:
-${tx}
-
-Return ONLY JSON with this shape:
-{
- "summary_ko": "2–3 sentence warm summary in Korean of what they talked about and how they did",
- "good_ko": ["2–3 specific things they did well, in Korean"],
- "corrections": [{"said":"what the learner actually said (short)","better":"how a native would casually say it in ${L.name}","why_ko":"short Korean explanation"}],
- "expressions": [{"en":"natural ${L.name} phrase worth stealing (from the call, or what they were trying to say)","ko":"Korean meaning","example":"short example sentence"}],
- "mission_ko": "one small, fun mission for the next call, in Korean",
- "fun_ko": "one witty, friendly one-liner comment about this call in Korean",
- "memory": "1–2 short English sentences of personal facts/plans/stories the learner shared that ${rec.partnerName} should remember next call",
- "scores": {"fluency":1-5,"vocabulary":1-5,"grammar":1-5,"confidence":1-5}
+  const both = rec.profileId==='both';
+  const prof = S.profiles.find(p=>p.id===rec.profileId);
+  const r = await api('report', { sessionId: rec.sessionId, transcript: rec.transcript,
+    names: both ? S.profiles.map(p=>p.name).join(' & ') : (prof?.name || 'learner'),
+    level: both ? 'mixed' : (prof?.level || 'intermediate'), textModel: isMaster() ? S.textModel : undefined });
+  return r.report;
 }
-Rules: corrections max 6, pick the most useful (not nitpicks); expressions 3–5; be encouraging but honest.`;
-  const tryModel = async model => {
-    const r = await fetch(`${REST}${model}:generateContent`, { method:'POST',
-      headers:{'Content-Type':'application/json','x-goog-api-key':S.apiKey},
-      body: JSON.stringify({contents:[{role:'user', parts:[{text:prompt}]}], generationConfig:{responseMimeType:'application/json', temperature:0.6}})});
-    if(!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0,200)}`);
-    const j = await r.json();
-    const text = j.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('') || '';
-    return JSON.parse(text.replace(/^```json\s*|```$/g,''));
-  };
-  try{ return await tryModel(S.textModel); }
-  catch(e){ console.warn(e); if(S.textModel!=='gemini-2.5-flash') return await tryModel('gemini-2.5-flash'); throw e; }
-}
-
 async function showReport(rec, generate){
+  if(!rec) return;
   go('report');
   const body = $('reportBody');
   if(generate || !rec.report){
     body.innerHTML = `<div class="loading"><div class="spin"></div>${esc(rec.partnerName)}랑 나눈 대화를 정리하는 중…</div>`;
     try{
       const rep = await makeReport(rec);
-      rep.expressions = rep.expressions || []; rep.corrections = rep.corrections || [];
-      rec.report = rep; const i = S.history.findIndex(h=>h.id===rec.id); if(i>=0) S.history[i] = rec; save();
+      rec.report = rep; const i = S.history.findIndex(h=>h.id===rec.id); if(i>=0) S.history[i] = rec; save(); cloudPutCall(rec);
     }catch(e){
-      body.innerHTML = `<div class="card"><b>리포트를 만들지 못했어요</b><p class="note">${esc(e.message)}</p><button class="btn" onclick='retryReport("${rec.id}")'>다시 시도</button></div>` + txBlock(rec, true);
+      body.innerHTML = `<div class="card"><b>리포트를 만들지 못했어요</b><p class="note">${esc(errMsg(e))}</p><button class="btn" data-retry="${esc(rec.id)}">다시 시도</button></div>` + txBlock(rec, true);
       return;
     }
   }
   const r = rec.report, sc = r.scores || {};
   const m = Math.floor(rec.secs/60), s = rec.secs%60;
+  const arr = v => Array.isArray(v) ? v : [];
   body.innerHTML = `
     <div class="card">
       <div class="h">${esc(rec.day)} · ${esc(rec.partnerName)} · ${m}분 ${s}초 · ${esc(rec.topic||'')}</div>
-      <div style="font-size:17px;font-weight:700;line-height:1.45;margin-bottom:8px">${esc(r.fun_ko||'')}</div>
-      <div class="topic">${esc(r.summary_ko||'')}</div>
+      <div style="font-size:17px;font-weight:700;line-height:1.45;margin-bottom:8px">${rich(r.fun_ko)}</div>
+      <div class="topic">${rich(r.summary_ko)}</div>
     </div>
     <div class="card"><div class="score">
-      ${[['fluency','유창성'],['vocabulary','어휘'],['grammar','문법'],['confidence','자신감']].map(([k,l])=>`<div><b>${sc[k]??'-'}</b><small>${l}</small></div>`).join('')}
+      ${[['fluency','유창성'],['vocabulary','어휘'],['grammar','문법'],['confidence','자신감']].map(([k,l])=>`<div><b>${esc(sc[k]??'-')}</b><small>${l}</small></div>`).join('')}
     </div></div>
-    ${r.good_ko?.length ? `<div class="card"><div class="h">👏 잘한 점</div><ul class="k">${r.good_ko.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
-    ${r.corrections.length ? `<div class="card"><div class="h">✏️ 이렇게 말하면 더 자연스러워요</div>${r.corrections.map(c=>`
-      <div class="corr"><div class="said">${esc(c.said)}</div><div class="better">→ ${esc(c.better)}</div><div class="why">${esc(c.why_ko)}</div></div>`).join('')}</div>`:''}
-    ${r.expressions.length ? `<div class="card exp"><div class="h">🧲 훔쳐갈 표현 (다음 통화 때 상대가 다시 써줘요)</div>${r.expressions.map(x=>`
-      <div><b>${esc(x.en)}</b> <span>— ${esc(x.ko)}</span><small>${esc(x.example)}</small></div>`).join('')}</div>`:''}
-    ${r.mission_ko ? `<div class="card"><div class="h">🎯 다음 통화 미션</div><div class="topic">${esc(r.mission_ko)}</div></div>`:''}
+    ${arr(r.good_ko).length ? `<div class="card"><div class="h">👏 잘한 점</div><ul class="k">${arr(r.good_ko).map(x=>`<li>${rich(x)}</li>`).join('')}</ul></div>`:''}
+    ${arr(r.corrections).length ? `<div class="card"><div class="h">✏️ 이렇게 말하면 더 자연스러워요</div>${arr(r.corrections).map(c=>`
+      <div class="corr"><div class="said">${esc(c?.said)}</div><div class="better">→ ${esc(c?.better)}</div><div class="why">${rich(c?.why_ko)}</div></div>`).join('')}</div>`:''}
+    ${arr(r.expressions).length ? `<div class="card exp"><div class="h">🧲 훔쳐갈 표현 (다음 통화 때 상대가 다시 써줘요)</div>${arr(r.expressions).map(x=>`
+      <div><b>${esc(x?.en)}</b> <span>— ${esc(x?.ko)}</span><small>${esc(x?.example)}</small></div>`).join('')}</div>`:''}
+    ${r.mission_ko ? `<div class="card"><div class="h">🎯 다음 통화 미션</div><div class="topic">${rich(r.mission_ko)}</div></div>`:''}
     ${txBlock(rec)}
-    <button class="btn pri" onclick="go('home')">홈으로</button>`;
+    <button class="btn pri" data-go="home">홈으로</button>`;
 }
 function txBlock(rec, open){
   return `<div class="card"><details ${open?'open':''}><summary>📜 대화 전문 보기</summary><div class="tx">${rec.transcript.map(t=>`<p><b style="color:${t.role==='user'?'var(--accent2)':'var(--ink)'}">${t.role==='user'?'나':esc(rec.partnerName)}:</b> ${esc(t.text)}</p>`).join('')}</div></details></div>`;
 }
-function retryReport(id){ const rec = S.history.find(h=>h.id===id); if(rec) showReport(rec, true); }
+$('reportBody').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-retry]'); if(!b) return;
+  const rec = S.history.find(h=>h.id===b.dataset.retry); if(rec) showReport(rec, true);
+});
 
 /* ---------- 기록 ---------- */
 function renderHistory(){
   const list = $('histList');
   const items = [...S.history].reverse();
   if(!items.length){ list.innerHTML = '<div class="note">아직 통화 기록이 없어요. 첫 통화를 걸어보세요 📞</div>'; return; }
-  const pname = id => id==='both' ? '💑 같이' : (S.profiles.find(p=>p.id===id)?.name || '?');
-  list.innerHTML = items.map(h=>`<button class="hist" onclick='showReport(S.history.find(x=>x.id==="${h.id}"))'>
+  const pname = id => id==='both' ? '💑 같이' : (S.profiles.find(p=>p.id===id)?.name || '나');
+  list.innerHTML = items.map(h=>`<button class="hist" data-id="${esc(h.id)}">
     <div><b>${esc(h.partnerName)}</b> · ${esc(pname(h.profileId))}<br><small>${esc(h.day)} · ${Math.round(h.secs/60)}분 · ${esc(h.topic||'')}</small></div>
     <div>${h.report ? '📄' : '⏳'}</div></button>`).join('');
 }
+$('histList').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-id]'); if(!b) return;
+  const rec = S.history.find(h=>h.id===b.dataset.id); if(rec) showReport(rec, false);
+});
 
-/* ---------- base64 ---------- */
 function b64(buf){ const u = new Uint8Array(buf); let s=''; for(let i=0;i<u.length;i+=0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i+0x8000)); return btoa(s); }
 
-renderHome();
+/* =========================================================
+   ☁️ 로그인 · 동기화
+   ========================================================= */
+function setSync(state){
+  const el = $('syncChip'); if(!el) return;
+  el.textContent = {syncing:'· ☁️ 동기화 중…', ok:'· ☁️ 동기화됨', err:'· ⚠️ 동기화 실패'}[state] || '';
+  el.className = 'syncchip ' + (state==='ok' ? 'ok' : state==='err' ? 'err' : '');
+}
+function settingsPayload(){ const o = {...S}; delete o.history; delete o.owner; return o; }
+function queueSettingsPush(){
+  if(!sb || !user || pulling || !ME || !['tester','master'].includes(ME.role)) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(async () => {
+    const { error } = await sb.from('ringo_settings').upsert({ user_id:user.id, data:settingsPayload(), updated_at:new Date().toISOString() });
+    setSync(error ? 'err' : 'ok'); if(error) console.warn(error);
+  }, 800);
+}
+async function cloudPutCall(rec){
+  if(!sb || !user || !rec || !ME || !['tester','master'].includes(ME.role)) return;
+  const { error } = await sb.from('ringo_calls').upsert({ id:rec.id, user_id:user.id, ts:rec.ts, data:rec, updated_at:new Date().toISOString() });
+  setSync(error ? 'err' : 'ok'); if(error) console.warn(error);
+}
+async function cloudPull(){
+  pulling = true;
+  try{
+    const [st, cl] = await Promise.all([
+      sb.from('ringo_settings').select('data').maybeSingle(),
+      sb.from('ringo_calls').select('id,data').order('ts', {ascending:true}).limit(500),
+    ]);
+    if(st.error) throw st.error; if(cl.error) throw cl.error;
+    const remote = st.data?.data ? sanitizeState(st.data.data) : null;
+    const firstSync = S.owner !== user.id;
+    let pushSettings = !remote;
+    if(remote && (firstSync || remote.updatedAt >= S.updatedAt)){
+      const hist = S.history; S = remote; S.history = hist;
+    } else if(remote) pushSettings = true;
+    const cloudById = new Map((cl.data||[]).map(r=>[r.id, sanitizeRecord(r.data)]).filter(([,d])=>d));
+    const merged = new Map(S.history.map(h=>[h.id, h]));
+    for(const [id, d] of cloudById){ const loc = merged.get(id); if(!loc || (!loc.report && d.report)) merged.set(id, d); }
+    const toUpload = S.history.filter(h=>{ const c = cloudById.get(h.id); return !c || (h.report && !c.report); });
+    S.history = [...merged.values()].sort((a,b)=>a.ts-b.ts).slice(-200);
+    S.owner = user.id;
+    if(!remote && !isMaster()){
+      // 테스터 첫 로그인: 부부 프로필 대신 본인 프로필 하나
+      const nick = str((user.email||'').split('@')[0], 12).replace(/[^\p{L}\p{N}._-]/gu, '') || '나';
+      S.profiles = [{id:'p1', name:nick, level:'intermediate', interests:''}]; S.sel.profile = 'p1';
+    }
+    enforceLimits();
+    localSave();
+    pulling = false;
+    for(const h of toUpload) await cloudPutCall(h);
+    if(pushSettings) queueSettingsPush();
+  } finally { pulling = false; }
+}
+async function syncNow(){
+  try{ setSync('syncing'); await cloudPull(); setSync('ok'); if($('home').classList.contains('on')) renderHome(); }
+  catch(e){ console.warn(e); setSync('err'); toast('동기화 실패: ' + (e.message||e), 5000); }
+}
+async function refreshMe(){
+  ME = await api('me');
+  if(ME.role === 'pending' || ME.role === 'blocked'){
+    $('pTitle').textContent = ME.role==='blocked' ? '이용이 제한된 계정이에요' : '승인 대기 중이에요';
+    $('pBody').textContent = ME.role==='blocked' ? '관리자에게 문의해 주세요.' : '가입 신청이 접수됐어요. 관리자가 확인한 뒤 승인하면 바로 쓸 수 있어요.';
+    $('pEmail').textContent = user?.email || '';
+    go('pending'); return false;
+  }
+  return true;
+}
+async function afterLogin(){
+  if(S.owner && S.owner !== user.id){ S = structuredClone(DEFAULT); localSave(); }   // 다른 계정의 캐시는 버림
+  try{
+    if(!(await refreshMe())) return;
+    await syncNow(); go('home');
+  }catch(e){
+    toast(errMsg(e), 5000);
+    if(e.code==='invalid_session' || e.code==='no_session'){ await sb.auth.signOut(); go('auth'); } else go('auth');
+  }
+}
+async function doLogin(signup){
+  const email = $('aEmail').value.trim(), password = $('aPw').value;
+  if(!/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(email)){ toast('이메일을 확인해 주세요'); return; }
+  if(password.length < 8){ toast('비밀번호는 8자 이상이에요'); return; }
+  $('loginBtn').disabled = $('signupBtn').disabled = true;
+  try{
+    const res = signup
+      ? await sb.auth.signUp({ email, password, options:{ emailRedirectTo: location.origin + location.pathname } })
+      : await sb.auth.signInWithPassword({ email, password });
+    if(res.error){ toast((signup ? '가입' : '로그인') + ' 실패: ' + (res.error.message === 'Invalid login credentials' ? '이메일 또는 비밀번호가 맞지 않아요' : res.error.message), 5000); return; }
+    if(!res.data.session){ toast('확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요.', 8000); return; }
+    user = res.data.user; $('aPw').value = '';
+    await afterLogin();
+  } finally { $('loginBtn').disabled = $('signupBtn').disabled = false; }
+}
+async function doLogout(){
+  try{ if(sb) await sb.auth.signOut(); }catch(e){}
+  user = null; ME = null; S = structuredClone(DEFAULT);
+  try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+  setSync(''); go('auth'); toast('로그아웃했어요');
+}
+
+/* ---------- 이벤트 연결 (인라인 핸들러 최소화) ---------- */
+document.addEventListener('click', e=>{
+  const g = e.target.closest('[data-go]'); if(g){ go(g.dataset.go); return; }
+  const a = e.target.closest('[data-act="logout"]'); if(a){ doLogout(); }
+});
+$('loginBtn').onclick = () => doLogin(false);
+$('signupBtn').onclick = () => doLogin(true);
+$('pRefresh').onclick = async () => { try{ if(await refreshMe()){ await syncNow(); go('home'); toast('승인됐어요! 🎉'); } else toast('아직 대기 중이에요'); }catch(e){ toast(errMsg(e)); } };
+$('adminBtn').onclick = () => go('admin');
+$('callBtn').onclick = startCall;
+$('hangBtn').onclick = () => hangUp();
+$('muteBtn').onclick = toggleMute; $('sosBtn').onclick = sos; $('slowBtn').onclick = slower; $('capBtn').onclick = toggleCaps;
+$('saveBtn').onclick = saveSettings; $('saveTop').onclick = saveSettings;
+$('exportBtn').onclick = exportData; $('importBtn').onclick = importData;
+$('syncBtn').onclick = async () => { try{ await refreshMe(); }catch(e){} await syncNow(); renderSettings(); };
+document.addEventListener('visibilitychange', () => { if(document.visibilityState==='visible' && user && !C && ME && ['tester','master'].includes(ME.role)) { refreshMe().then(ok=>ok && syncNow()).catch(()=>{}); } });
+
+async function boot(){
+  if(!window.supabase){ $('loading').innerHTML = '<div class="wrap"><div class="card">로그인 모듈을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.</div></div>'; return; }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, flowType:'pkce' } });
+  const { data:{ session } } = await sb.auth.getSession();
+  user = session?.user || null;
+  sb.auth.onAuthStateChange((ev, s) => { user = s?.user || null; if(ev === 'SIGNED_OUT' && !$('auth').classList.contains('on')) go('auth'); });
+  if(location.search.includes('code=')) history.replaceState(null, '', location.pathname);   // 인증 링크 흔적 제거
+  if(!user){ go('auth'); return; }
+  await afterLogin();
+}
+boot();
 </script>
 </body>
 </html>
