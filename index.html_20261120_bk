@@ -188,8 +188,10 @@ select option:disabled{color:#777}
     </div>
 
     <div class="card" id="profileCard">
-      <div class="h">누가 통화하나요?</div>
-      <div class="chips" id="profileChips"></div>
+      <div class="row" style="align-items:center">
+        <div><div class="h" style="margin:0 0 4px">내 프로필</div><b id="meName">-</b> <small class="note" id="meMeta"></small></div>
+        <button class="mini" id="editProfileBtn" style="flex:0 0 auto">수정</button>
+      </div>
     </div>
 
     <div class="card">
@@ -270,6 +272,19 @@ select option:disabled{color:#777}
   </div>
 </section>
 
+<!-- PROFILE SETUP -->
+<section class="screen" id="profileSetup">
+  <div class="wrap">
+    <div class="top"><div class="logo">내 프로필</div></div>
+    <div class="card">
+      <p class="note" style="margin-top:0">통화 상대가 이 정보를 바탕으로 나에게 맞춰 이야기해요. 언제든 ⚙️ 설정에서 바꿀 수 있어요.</p>
+      <div id="setupFields"></div>
+      <div style="height:14px"></div>
+      <button class="btn pri" id="setupSave">저장하고 시작하기</button>
+    </div>
+  </div>
+</section>
+
 <!-- SETTINGS -->
 <section class="screen" id="settings">
   <div class="wrap">
@@ -287,7 +302,7 @@ select option:disabled{color:#777}
       <select id="sLang"></select>
     </div>
     <div class="card">
-      <div class="h">프로필</div>
+      <div class="h">내 프로필</div>
       <div id="sProfiles"></div>
     </div>
     <div class="card">
@@ -459,11 +474,8 @@ const VAD = { relaxed:1, normal:1, snappy:1 };  // 실제 값은 서버가 적�
 const STORE_KEY = 'ringo.v2';
 const DEFAULT = {
   lang:'en', liveModel:'gemini-3.1-flash-live-preview', textModel:'gemini-flash-latest', vad:'normal',
-  profiles:[
-    {id:'p1', name:'영범', level:'intermediate', interests:'클라우드/DevOps 일, 사이드 프로젝트, 여행'},
-    {id:'p2', name:'보미', level:'intermediate', interests:'광고/미디어 일, 패션·뷰티, 블로그'},
-  ],
-  sel:{profile:'p1', partner:'jamie', mode:'topic', role:0, dur:5, caps:'0', topicShift:0},
+  profile:null,   // {name, level, job, interests, goal} — 사용자가 직접 입력
+  sel:{ partner:'jamie', mode:'topic', role:0, dur:5, caps:'0', topicShift:0},
   history:[], updatedAt:0, owner:null,
 };
 let S = loadLocal();
@@ -480,10 +492,13 @@ function save(){ S.updatedAt = Date.now(); localSave(); queueSettingsPush(); }
 /* ---------- 입력값 정리 (클라우드/백업에서 온 데이터도 믿지 않음) ---------- */
 const str = (v, n) => (typeof v === 'string' ? v : '').slice(0, n);
 const ID_RE = /^[a-z0-9]{6,20}$/;
-function sanitizeProfile(p, i){
-  return { id: ['p1','p2','p3'].includes(p?.id) ? p.id : 'p' + (i + 1),
-           name: str(p?.name, 20).trim() || '나', level: LEVELS[p?.level] ? p.level : 'intermediate',
-           interests: str(p?.interests, 120) };
+const GOALS = {daily:'일상 대화', travel:'여행', work:'업무·회의', exam:'시험·면접', fun:'그냥 재미로'};
+function sanitizeProfile(p){
+  if(!p || typeof p !== 'object') return null;
+  const name = str(p.name, 20).trim();
+  if(!name) return null;
+  return { name, level: LEVELS[p.level] ? p.level : 'intermediate', job: str(p.job, 60).trim(),
+           interests: str(p.interests, 120).trim(), goal: GOALS[p.goal] ? p.goal : 'daily' };
 }
 function sanitizeRecord(h){
   if(!h || typeof h !== 'object' || !ID_RE.test(String(h.id))) return null;
@@ -502,9 +517,9 @@ function sanitizeState(o){
   d.liveModel = LIVE_MODEL_LABELS[o.liveModel] ? o.liveModel : d.liveModel;
   d.textModel = /^gemini-[a-z0-9.\-]{1,60}$/.test(o.textModel||'') ? o.textModel : d.textModel;
   d.vad = VAD[o.vad] ? o.vad : 'normal';
-  if(Array.isArray(o.profiles) && o.profiles.length) d.profiles = o.profiles.slice(0,2).map(sanitizeProfile);
+  d.profile = sanitizeProfile(o.profile);
   const s = o.sel || {};
-  d.sel = { profile: ['p1','p2','both'].includes(s.profile) ? s.profile : 'p1', partner: str(s.partner,20) || 'jamie',
+  d.sel = { partner: str(s.partner,20) || 'jamie',
             mode: ['free','topic','role'].includes(s.mode) ? s.mode : 'topic', role: Math.max(0, Math.min(ROLEPLAYS.length-1, Number(s.role)||0)),
             dur: ALL_DURATIONS.includes(Number(s.dur)) ? Number(s.dur) : 5, caps: s.caps === '1' ? '1' : '0', topicShift: Number(s.topicShift)||0 };
   d.history = (Array.isArray(o.history)?o.history:[]).map(sanitizeRecord).filter(Boolean).slice(-200);
@@ -531,9 +546,10 @@ const allowLang = l => lim().langs.includes(l);
 const allowPartner = id => lim().partners.includes(id);
 function lang(){ return LANGS[S.lang] || LANGS.en; }
 function partner(){ const L=lang(); return L.partners.find(p=>p.id===S.sel.partner) || L.partners[0]; }
-function isCouple(){ return S.sel.profile==='both' && lim().canCouple; }
-function learners(){ return isCouple() ? S.profiles : [S.profiles.find(p=>p.id===S.sel.profile) || S.profiles[0]]; }
-function todayTopic(){ const off = S.profiles.findIndex(p=>p.id===S.sel.profile); return TOPICS[(dayIndex() + Math.max(0,off)*7 + (S.sel.topicShift||0)) % TOPICS.length]; }
+function isCouple(){ return false; }
+function me(){ return S.profile || {name:'나', level:'intermediate', job:'', interests:'', goal:'daily'}; }
+function learners(){ return [me()]; }
+function todayTopic(){ return TOPICS[(dayIndex() + (S.sel.topicShift||0)) % TOPICS.length]; }
 const PAY = '💳 결제 필요';
 
 // 역할에 맞게 선택값을 강제로 맞춤 (서버도 같은 규칙으로 막음)
@@ -543,7 +559,6 @@ function enforceLimits(){
     S.sel.partner = (LANGS[S.lang].partners.find(p=>allowPartner(p.id)) || LANGS[S.lang].partners[0]).id;
   }
   if(!allowDur(S.sel.dur)) S.sel.dur = Math.max(...lim().durations.filter(d=>d<=S.sel.dur), lim().durations[0]);
-  if(S.sel.profile==='both' && !lim().canCouple) S.sel.profile = 'p1';
   if(!isMaster()){ S.liveModel = DEFAULT.liveModel; S.textModel = DEFAULT.textModel; }
 }
 
@@ -584,13 +599,10 @@ function renderHome(){
   const out = tester && max !== null && used >= max;
   btn.disabled = out; btn.textContent = out ? `${PAY} · 오늘 무료 통화 끝` : '📞 전화 걸기';
 
-  // profiles
-  const pc = $('profileChips'); pc.textContent = '';
-  const list = (isMaster() ? S.profiles : S.profiles.slice(0,1)).map(p=>({id:p.id, label:'🙋 '+p.name}));
-  if(lim().canCouple) list.push({id:'both', label:'💑 같이 통화'});
-  list.forEach(p=>{ const b=document.createElement('button'); b.className='chip'+(S.sel.profile===p.id?' on':''); b.textContent=p.label;
-    b.onclick=()=>{S.sel.profile=p.id; save(); renderHome();}; pc.appendChild(b); });
-  $('profileCard').style.display = list.length > 1 ? '' : 'none';
+  // my profile
+  const P0 = me();
+  $('meName').textContent = P0.name;
+  $('meMeta').textContent = ` · ${LEVELS[P0.level]?.ko || ''} · ${GOALS[P0.goal] || ''}`;
 
   // streak
   const st = streak(); $('streakNum').textContent = st.n;
@@ -633,8 +645,7 @@ function renderHome(){
   $('capSel').value = S.sel.caps; $('capSel').onchange=e=>{ S.sel.caps = e.target.value==='1'?'1':'0'; save(); };
 }
 function streak(){
-  const ids = isCouple() ? S.profiles.map(p=>p.id).concat('both') : [S.sel.profile, 'both'];
-  const days = new Set(S.history.filter(h=>ids.includes(h.profileId)).map(h=>h.day));
+  const days = new Set(S.history.map(h=>h.day));
   let n=0, d=new Date(); const today = days.has(dayKey(d));
   if(!today) d = new Date(Date.now()-86400000);
   while(days.has(dayKey(d))){ n++; d = new Date(d.getTime()-86400000); }
@@ -648,16 +659,7 @@ function renderSettings(){
   Object.entries(LANGS).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; const ok=allowLang(k);
     o.textContent = ok ? v.label : `${v.label} · ${PAY}`; o.disabled=!ok; if(S.lang===k) o.selected=true; sl.appendChild(o); });
   $('sVad').value = S.vad;
-  const box=$('sProfiles'); box.textContent='';
-  (isMaster() ? S.profiles : S.profiles.slice(0,1)).forEach((p,i)=>{
-    const w=document.createElement('div'); if(i) w.style.cssText='border-top:1px solid var(--line);margin-top:14px;padding-top:4px';
-    w.innerHTML=`<div class="row"><div><label for="pn${i}">이름</label><input id="pn${i}" maxlength="20"></div>
-      <div><label for="pl${i}">레벨</label><select id="pl${i}"></select></div></div>
-      <label for="pi${i}">관심사 (대화 소재로 쓰여요)</label><input id="pi${i}" maxlength="120">`;
-    box.appendChild(w);
-    $('pn'+i).value=p.name; $('pi'+i).value=p.interests;
-    Object.entries(LEVELS).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v.ko; if(p.level===k) o.selected=true; $('pl'+i).appendChild(o); });
-  });
+  renderProfileFields($('sProfiles'), 's');
   $('advCard').style.display = isMaster() ? '' : 'none';
   if(isMaster()){
     const lv=$('sLive'); lv.textContent='';
@@ -668,15 +670,29 @@ function renderSettings(){
 function saveSettings(){
   const nl = $('sLang').value; if(allowLang(nl)) S.lang = nl; else toast(PAY);
   S.vad = VAD[$('sVad').value] ? $('sVad').value : 'normal';
-  (isMaster() ? S.profiles : S.profiles.slice(0,1)).forEach((p,i)=>{
-    p.name = str($('pn'+i).value, 20).trim() || p.name; p.level = LEVELS[$('pl'+i).value] ? $('pl'+i).value : p.level; p.interests = str($('pi'+i).value, 120).trim();
-  });
+  const np = readProfileFields('s'); if(np) S.profile = np; else { toast('이름을 입력해 주세요'); return; }
   if(isMaster()){
     if(LIVE_MODEL_LABELS[$('sLive').value]) S.liveModel = $('sLive').value;
     const tm = $('sText').value.trim(); S.textModel = /^gemini-[a-z0-9.\-]{1,60}$/.test(tm) ? tm : DEFAULT.textModel;
   }
   enforceLimits(); save(); toast('저장했어요 ✅'); go('home');
 }
+function renderProfileFields(box, px){
+  const p = S.profile || { name: suggestNick(), level:'intermediate', job:'', interests:'', goal:'daily' };
+  box.innerHTML = `<div class="row"><div><label for="${px}Name" style="margin-top:0">이름 (상대가 부를 이름)</label><input id="${px}Name" maxlength="20" autocomplete="nickname"></div>
+    <div><label for="${px}Level" style="margin-top:0">내 영어 레벨</label><select id="${px}Level"></select></div></div>
+    <label for="${px}Job">하는 일</label><input id="${px}Job" maxlength="60" placeholder="예: 광고대행사 미디어 플래너, 대학생, 육아 중">
+    <label for="${px}Int">관심사 (대화 소재로 쓰여요)</label><input id="${px}Int" maxlength="120" placeholder="예: 여행, 러닝, 넷플릭스, 요리">
+    <label for="${px}Goal">영어를 배우는 이유</label><select id="${px}Goal"></select>`;
+  $(px+'Name').value = p.name; $(px+'Job').value = p.job || ''; $(px+'Int').value = p.interests || '';
+  Object.entries(LEVELS).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v.ko; if(p.level===k) o.selected=true; $(px+'Level').appendChild(o); });
+  Object.entries(GOALS).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v; if(p.goal===k) o.selected=true; $(px+'Goal').appendChild(o); });
+}
+function readProfileFields(px){
+  return sanitizeProfile({ name:$(px+'Name').value, level:$(px+'Level').value, job:$(px+'Job').value, interests:$(px+'Int').value, goal:$(px+'Goal').value });
+}
+function suggestNick(){ return str(((user && user.email) || '').split('@')[0], 12).replace(/[^\p{L}\p{N}._-]/gu, '') || ''; }
+function openProfileSetup(){ renderProfileFields($('setupFields'), 'u'); go('profileSetup'); }
 function exportData(){
   const txt = JSON.stringify({...S, owner:undefined}, null, 1);
   navigator.clipboard?.writeText(txt).then(()=>toast('기록을 클립보드에 복사했어요')).catch(()=>toast('복사 실패 — 브라우저 권한을 확인해 주세요'));
@@ -687,7 +703,7 @@ function importData(){
   const ids = new Set(S.history.map(h=>h.id));
   const add = incoming.history.filter(h=>!ids.has(h.id));
   S.history = [...S.history, ...add].sort((a,b)=>a.ts-b.ts).slice(-200);
-  if(isMaster() && Array.isArray(o.profiles) && o.profiles.length) S.profiles = incoming.profiles;
+  if(!S.profile && incoming.profile) S.profile = incoming.profile;
   save(); add.forEach(h=>cloudPutCall(h));
   $('importTxt').value=''; toast(`가져왔어요: 통화 ${add.length}건 추가`);
 }
@@ -729,12 +745,12 @@ $('adminList').addEventListener('click', e=>{
 function buildSystem(){
   const L = lang(), P = partner(), Ls = learners();
   const lv = LEVELS[Ls[0].level] || LEVELS.intermediate;
-  const who = isCouple()
-    ? `${Ls[0].name} and ${Ls[1].name}, a Korean married couple, together on speakerphone. Both are learning ${L.name}. ${Ls[0].name}'s interests: ${Ls[0].interests}. ${Ls[1].name}'s interests: ${Ls[1].interests}.`
-    : `${Ls[0].name}, a Korean ${L.name} learner. Interests: ${Ls[0].interests}.`;
-  const past = S.history.filter(h=>h.partnerId===P.id && h.lang===S.lang && h.profileId===S.sel.profile && h.report?.memory).slice(-3)
+  const GOAL_EN = {daily:'everyday conversation', travel:'travel', work:'work and meetings', exam:'exams and job interviews', fun:'just for fun'};
+  const who = `${Ls[0].name}, a Korean ${L.name} learner.` + (Ls[0].job ? ` What they do: ${Ls[0].job}.` : '') +
+    (Ls[0].interests ? ` Interests: ${Ls[0].interests}.` : '') + ` They are learning mainly for ${GOAL_EN[Ls[0].goal] || 'everyday conversation'} — lean your topics and expressions that way when it fits.`;
+  const past = S.history.filter(h=>h.partnerId===P.id && h.lang===S.lang && h.report?.memory).slice(-3)
                  .map(h=>`- (${h.day}) ${h.report.memory}`).join('\n');
-  const recentExp = S.history.filter(h=>h.profileId===S.sel.profile && h.report?.expressions?.length).slice(-2)
+  const recentExp = S.history.filter(h=>h.report?.expressions?.length).slice(-2)
                  .flatMap(h=>h.report.expressions.map(e=>e.en)).slice(0,5);
   let task;
   if(S.sel.mode==='topic') task = `Today's conversation topic: ${todayTopic()}. Don't announce it like a teacher — drift into it naturally after the hello, the way a friend brings something up.`;
@@ -982,7 +998,7 @@ function hangUp(failed){
   const userChars = call.transcript.filter(t=>t.role==='user').reduce((n,t)=>n+t.text.trim().length, 0);
   if(secs < 20 || userChars < 15){ if(!failed) toast('통화가 너무 짧아서 리포트는 건너뛸게요'); go('home'); return; }
   const P = partner();
-  const rec = sanitizeRecord({ id: Date.now().toString(36), day: dayKey(), ts: Date.now(), profileId: S.sel.profile, lang: S.lang,
+  const rec = sanitizeRecord({ id: Date.now().toString(36), day: dayKey(), ts: Date.now(), profileId: 'me', lang: S.lang,
     partnerId: P.id, partnerName: P.name, mode: S.sel.mode, sessionId: call.sessionId,
     topic: S.sel.mode==='topic' ? todayTopic() : S.sel.mode==='role' ? ROLEPLAYS[S.sel.role]?.ko : '자유 수다',
     secs, transcript: call.transcript.map(t=>({role:t.role, text:t.text.trim()})), report:null });
@@ -992,11 +1008,8 @@ function hangUp(failed){
 
 /* ---------- 리포트 (서버가 만듦) ---------- */
 async function makeReport(rec){
-  const both = rec.profileId==='both';
-  const prof = S.profiles.find(p=>p.id===rec.profileId);
   const r = await api('report', { sessionId: rec.sessionId, transcript: rec.transcript,
-    names: both ? S.profiles.map(p=>p.name).join(' & ') : (prof?.name || 'learner'),
-    level: both ? 'mixed' : (prof?.level || 'intermediate'), textModel: isMaster() ? S.textModel : undefined });
+    names: me().name, level: me().level, textModel: isMaster() ? S.textModel : undefined });
   return r.report;
 }
 async function showReport(rec, generate){
@@ -1047,9 +1060,8 @@ function renderHistory(){
   const list = $('histList');
   const items = [...S.history].reverse();
   if(!items.length){ list.innerHTML = '<div class="note">아직 통화 기록이 없어요. 첫 통화를 걸어보세요 📞</div>'; return; }
-  const pname = id => id==='both' ? '💑 같이' : (S.profiles.find(p=>p.id===id)?.name || '나');
   list.innerHTML = items.map(h=>`<button class="hist" data-id="${esc(h.id)}">
-    <div><b>${esc(h.partnerName)}</b> · ${esc(pname(h.profileId))}<br><small>${esc(h.day)} · ${Math.round(h.secs/60)}분 · ${esc(h.topic||'')}</small></div>
+    <div><b>${esc(h.partnerName)}</b><br><small>${esc(h.day)} · ${Math.round(h.secs/60)}분 · ${esc(h.topic||'')}</small></div>
     <div>${h.report ? '📄' : '⏳'}</div></button>`).join('');
 }
 $('histList').addEventListener('click', e=>{
@@ -1101,11 +1113,6 @@ async function cloudPull(){
     const toUpload = S.history.filter(h=>{ const c = cloudById.get(h.id); return !c || (h.report && !c.report); });
     S.history = [...merged.values()].sort((a,b)=>a.ts-b.ts).slice(-200);
     S.owner = user.id;
-    if(!remote && !isMaster()){
-      // 테스터 첫 로그인: 부부 프로필 대신 본인 프로필 하나
-      const nick = str((user.email||'').split('@')[0], 12).replace(/[^\p{L}\p{N}._-]/gu, '') || '나';
-      S.profiles = [{id:'p1', name:nick, level:'intermediate', interests:''}]; S.sel.profile = 'p1';
-    }
     enforceLimits();
     localSave();
     pulling = false;
@@ -1131,7 +1138,8 @@ async function afterLogin(){
   if(S.owner && S.owner !== user.id){ S = structuredClone(DEFAULT); localSave(); }   // 다른 계정의 캐시는 버림
   try{
     if(!(await refreshMe())) return;
-    await syncNow(); go('home');
+    await syncNow();
+    if(!S.profile) openProfileSetup(); else go('home');
   }catch(e){
     toast(errMsg(e), 5000);
     if(e.code==='invalid_session' || e.code==='no_session'){ await sb.auth.signOut(); go('auth'); } else go('auth');
@@ -1166,8 +1174,10 @@ document.addEventListener('click', e=>{
 });
 $('loginBtn').onclick = () => doLogin(false);
 $('signupBtn').onclick = () => doLogin(true);
-$('pRefresh').onclick = async () => { try{ if(await refreshMe()){ await syncNow(); go('home'); toast('승인됐어요! 🎉'); } else toast('아직 대기 중이에요'); }catch(e){ toast(errMsg(e)); } };
+$('pRefresh').onclick = async () => { try{ if(await refreshMe()){ await syncNow(); if(!S.profile) openProfileSetup(); else go('home'); toast('승인됐어요! 🎉'); } else toast('아직 대기 중이에요'); }catch(e){ toast(errMsg(e)); } };
 $('adminBtn').onclick = () => go('admin');
+$('editProfileBtn').onclick = openProfileSetup;
+$('setupSave').onclick = () => { const np = readProfileFields('u'); if(!np){ toast('이름을 입력해 주세요'); return; } S.profile = np; save(); toast('프로필을 저장했어요 ✅'); go('home'); };
 $('callBtn').onclick = startCall;
 $('hangBtn').onclick = () => hangUp();
 $('muteBtn').onclick = toggleMute; $('sosBtn').onclick = sos; $('slowBtn').onclick = slower; $('capBtn').onclick = toggleCaps;
