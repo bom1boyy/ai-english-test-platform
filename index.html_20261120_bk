@@ -184,7 +184,7 @@ select option:disabled{color:#777}
       <div class="row" style="align-items:center">
         <div><span class="badge">TESTER</span> <b id="usageText">오늘 무료 통화 0/3</b></div>
       </div>
-      <p class="note" id="usageNote" style="margin:8px 0 0">테스터는 Jamie와 영어로, 한 번에 최대 5분까지 무료로 통화할 수 있어요.</p>
+      <p class="note" id="usageNote" style="margin:8px 0 0">테스터는 영어(Jamie)·한국어(Jiwoo)로, 한 번에 최대 5분까지 무료로 통화할 수 있어요.</p>
     </div>
 
     <div class="card" id="profileCard">
@@ -268,7 +268,7 @@ select option:disabled{color:#777}
   <div class="wrap">
     <div class="top"><div class="logo">사용자 관리</div><button class="iconbtn" data-go="home">🏠</button></div>
     <div class="card" id="adminList"><div class="loading"><div class="spin"></div></div></div>
-    <p class="note">승인 = 테스터(영어·Jamie·최대 5분·하루 3회). 마스터 지정/해제는 보안상 SQL에서만 할 수 있어요.</p>
+    <p class="note">승인 = 테스터(영어 Jamie·한국어 Jiwoo·최대 5분·하루 3회). 마스터 지정/해제는 보안상 SQL에서만 할 수 있어요.</p>
   </div>
 </section>
 
@@ -405,7 +405,24 @@ const LANGS = {
       {id:'camille', em:'🥐', name:'Camille', voice:'Leda', tag:'파리 · 31 · 사진작가',
        bio:'31, from Paris. Photographer, cinema nerd, complains about the metro.', accent:'Parisian French', humor:'ironic, witty, a little dramatic'},
     ]},
+  ko: {
+    label: '🇰🇷 한국어', name: 'Korean',
+    fillers: '"음…", "어…", "아 근데", "진짜요?", "헐", "대박", "그니까요", "약간", "있잖아요", "아 맞다"',
+    partners: [
+      {id:'jiwoo', em:'🧋', name:'Jiwoo 지우', voice:'Leda', tag:'서울 · 26 · 카페 사장',
+       bio:'26, lives in Mangwon-dong, Seoul. Runs a tiny café, obsessed with K-dramas and webtoons, goes to concerts, knows every trendy spot in Hongdae and Seongsu.',
+       accent:'natural Seoul standard Korean', humor:'bright and playful; loves teaching trendy expressions and slang (and explaining them)'},
+      {id:'minjun', em:'⚾', name:'Minjun 민준', voice:'Fenrir', tag:'부산 · 30 · 게임회사 직장인',
+       bio:'30, from Busan, now works at a game company in Pangyo. Huge Lotte Giants baseball fan, loves dwaeji-gukbap and the sea, a bit of a joker.',
+       accent:'Korean with a light, friendly Busan (Gyeongsang) accent — keep it easy to understand', humor:'teasing big-brother energy, 아재개그 puns, friendly banter'},
+      {id:'sua', em:'🍲', name:'Sua 수아', voice:'Aoede', tag:'서울 · 34 · 요리 선생님',
+       bio:'34, from Seoul. Teaches home-cooking classes, loves traditional markets like Gwangjang and Mangwon, travels around Korea on weekends.',
+       accent:'warm, clear Seoul standard Korean', humor:'warm and gently teasing, caring big-sister vibes'},
+    ]},
 };
+const NATIVE = {ko:{label:'한국어', en:'Korean'}, en:{label:'English', en:'English'}, ja:{label:'日本語', en:'Japanese'}, zh:{label:'中文', en:'Chinese'},
+  es:{label:'Español', en:'Spanish'}, fr:{label:'Français', en:'French'}, de:{label:'Deutsch', en:'German'}, pt:{label:'Português', en:'Portuguese'},
+  vi:{label:'Tiếng Việt', en:'Vietnamese'}, id:{label:'Bahasa Indonesia', en:'Indonesian'}, th:{label:'ไทย', en:'Thai'}};
 
 const TOPICS = [
   'what they did last weekend — dig into one specific moment',
@@ -498,7 +515,7 @@ function sanitizeProfile(p){
   const name = str(p.name, 20).trim();
   if(!name) return null;
   return { name, level: LEVELS[p.level] ? p.level : 'intermediate', job: str(p.job, 60).trim(),
-           interests: str(p.interests, 120).trim(), goal: GOALS[p.goal] ? p.goal : 'daily' };
+           interests: str(p.interests, 120).trim(), goal: GOALS[p.goal] ? p.goal : 'daily', nativeLang: NATIVE[p.nativeLang] ? p.nativeLang : 'ko' };
 }
 function sanitizeRecord(h){
   if(!h || typeof h !== 'object' || !ID_RE.test(String(h.id))) return null;
@@ -547,7 +564,7 @@ const allowPartner = id => lim().partners.includes(id);
 function lang(){ return LANGS[S.lang] || LANGS.en; }
 function partner(){ const L=lang(); return L.partners.find(p=>p.id===S.sel.partner) || L.partners[0]; }
 function isCouple(){ return false; }
-function me(){ return S.profile || {name:'나', level:'intermediate', job:'', interests:'', goal:'daily'}; }
+function me(){ return S.profile || {name:'나', level:'intermediate', job:'', interests:'', goal:'daily', nativeLang:'ko'}; }
 function learners(){ return [me()]; }
 function todayTopic(){ return TOPICS[(dayIndex() + (S.sel.topicShift||0)) % TOPICS.length]; }
 const PAY = '💳 결제 필요';
@@ -593,7 +610,7 @@ function renderHome(){
   const used = L.dailyUsed || 0, max = L.dailyMax;
   if(tester){
     $('usageText').textContent = `오늘 무료 통화 ${Math.min(used, max)}/${max}`;
-    $('usageNote').textContent = used >= max ? `오늘 무료 통화를 다 썼어요. 더 하려면 ${PAY}` : '테스터는 Jamie와 영어로, 한 번에 최대 5분까지 무료로 통화할 수 있어요.';
+    $('usageNote').textContent = used >= max ? `오늘 무료 통화를 다 썼어요. 더 하려면 ${PAY}` : '테스터는 영어(Jamie)·한국어(Jiwoo)로, 한 번에 최대 5분까지 무료로 통화할 수 있어요.';
   }
   const btn = $('callBtn');
   const out = tester && max !== null && used >= max;
@@ -656,7 +673,7 @@ function streak(){
 function renderSettings(){
   $('acctInfo').textContent = user ? `${user.email} · ${({master:'마스터', tester:'테스터'})[ME?.role] || ME?.role || ''}` : '';
   const sl=$('sLang'); sl.textContent='';
-  Object.entries(LANGS).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; const ok=allowLang(k);
+  ['en','ko','ja','es','zh','fr'].filter(k=>LANGS[k]).map(k=>[k,LANGS[k]]).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; const ok=allowLang(k);
     o.textContent = ok ? v.label : `${v.label} · ${PAY}`; o.disabled=!ok; if(S.lang===k) o.selected=true; sl.appendChild(o); });
   $('sVad').value = S.vad;
   renderProfileFields($('sProfiles'), 's');
@@ -678,18 +695,20 @@ function saveSettings(){
   enforceLimits(); save(); toast('저장했어요 ✅'); go('home');
 }
 function renderProfileFields(box, px){
-  const p = S.profile || { name: suggestNick(), level:'intermediate', job:'', interests:'', goal:'daily' };
+  const p = S.profile || { name: suggestNick(), level:'intermediate', job:'', interests:'', goal:'daily', nativeLang:'ko' };
   box.innerHTML = `<div class="row"><div><label for="${px}Name" style="margin-top:0">이름 (상대가 부를 이름)</label><input id="${px}Name" maxlength="20" autocomplete="nickname"></div>
-    <div><label for="${px}Level" style="margin-top:0">내 영어 레벨</label><select id="${px}Level"></select></div></div>
+    <div><label for="${px}Level" style="margin-top:0">내 레벨 (배우는 언어 기준)</label><select id="${px}Level"></select></div></div>
     <label for="${px}Job">하는 일</label><input id="${px}Job" maxlength="60" placeholder="예: 광고대행사 미디어 플래너, 대학생, 육아 중">
     <label for="${px}Int">관심사 (대화 소재로 쓰여요)</label><input id="${px}Int" maxlength="120" placeholder="예: 여행, 러닝, 넷플릭스, 요리">
-    <label for="${px}Goal">영어를 배우는 이유</label><select id="${px}Goal"></select>`;
+    <label for="${px}Goal">언어를 배우는 이유</label><select id="${px}Goal"></select>
+    <label for="${px}Native">모국어 (리포트 설명 언어)</label><select id="${px}Native"></select>`;
   $(px+'Name').value = p.name; $(px+'Job').value = p.job || ''; $(px+'Int').value = p.interests || '';
   Object.entries(LEVELS).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v.ko; if(p.level===k) o.selected=true; $(px+'Level').appendChild(o); });
   Object.entries(GOALS).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v; if(p.goal===k) o.selected=true; $(px+'Goal').appendChild(o); });
+  Object.entries(NATIVE).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v.label; if((p.nativeLang||'ko')===k) o.selected=true; $(px+'Native').appendChild(o); });
 }
 function readProfileFields(px){
-  return sanitizeProfile({ name:$(px+'Name').value, level:$(px+'Level').value, job:$(px+'Job').value, interests:$(px+'Int').value, goal:$(px+'Goal').value });
+  return sanitizeProfile({ name:$(px+'Name').value, level:$(px+'Level').value, job:$(px+'Job').value, interests:$(px+'Int').value, goal:$(px+'Goal').value, nativeLang:$(px+'Native').value });
 }
 function suggestNick(){ return str(((user && user.email) || '').split('@')[0], 12).replace(/[^\p{L}\p{N}._-]/gu, '') || ''; }
 function openProfileSetup(){ renderProfileFields($('setupFields'), 'u'); go('profileSetup'); }
@@ -746,12 +765,13 @@ function buildSystem(){
   const L = lang(), P = partner(), Ls = learners();
   const lv = LEVELS[Ls[0].level] || LEVELS.intermediate;
   const GOAL_EN = {daily:'everyday conversation', travel:'travel', work:'work and meetings', exam:'exams and job interviews', fun:'just for fun'};
-  const who = `${Ls[0].name}, a Korean ${L.name} learner.` + (Ls[0].job ? ` What they do: ${Ls[0].job}.` : '') +
+  const NL = (NATIVE[Ls[0].nativeLang] || NATIVE.ko).en;
+  const who = `${Ls[0].name}, a ${L.name} learner whose native language is ${NL}.` + (Ls[0].job ? ` What they do: ${Ls[0].job}.` : '') +
     (Ls[0].interests ? ` Interests: ${Ls[0].interests}.` : '') + ` They are learning mainly for ${GOAL_EN[Ls[0].goal] || 'everyday conversation'} — lean your topics and expressions that way when it fits.`;
   const past = S.history.filter(h=>h.partnerId===P.id && h.lang===S.lang && h.report?.memory).slice(-3)
                  .map(h=>`- (${h.day}) ${h.report.memory}`).join('\n');
   const recentExp = S.history.filter(h=>h.report?.expressions?.length).slice(-2)
-                 .flatMap(h=>h.report.expressions.map(e=>e.en)).slice(0,5);
+                 .flatMap(h=>h.report.expressions.map(e=>e.phrase || e.en)).filter(Boolean).slice(0,5);
   let task;
   if(S.sel.mode==='topic') task = `Today's conversation topic: ${todayTopic()}. Don't announce it like a teacher — drift into it naturally after the hello, the way a friend brings something up.`;
   else if(S.sel.mode==='role') task = `ROLE-PLAY for this call (stay in this role the whole time, but keep the same human way of talking): ${ROLEPLAYS[S.sel.role]?.en}. Open the scene yourself.`;
@@ -759,7 +779,7 @@ function buildSystem(){
 
   return `You are ${P.name}. ${P.bio} You speak ${L.name} with a ${P.accent} accent. Your sense of humor: ${P.humor}.
 You are on a phone call with ${who}
-This is a chat between friends, NOT a lesson. You are not an assistant. Speak ONLY in ${L.name} (except a quick Korean word if they're totally stuck and ask for it).
+This is a chat between friends, NOT a lesson. You are not an assistant. Speak ONLY in ${L.name} (except a quick word in ${NL} if they're totally stuck and ask for it).
 
 HOW YOU TALK — the most important part:
 - Sound like a real human on the phone. Short turns: usually 1–3 sentences. Never lists, never lectures, never "Great question!".
@@ -770,10 +790,11 @@ HOW YOU TALK — the most important part:
 - If they stop mid-sentence hunting for a word, jump in like a friend: offer the word or finish their thought with a question ("...nervous?"). If they ramble, it's fine to cut in with a reaction or a question.
 - When they finish a sentence with a rising "and..." or "um..." it's OK to give a short backchannel like "mm-hm, yeah?" to keep them going.
 - Their level: ${lv.en}
-- If they say a Korean word or ask how to say something, give the natural phrase quickly, maybe repeat it once in a sentence, and move on.
+- If they say a word in ${NL} or ask how to say something, give the natural phrase quickly, maybe repeat it once in a sentence, and move on.
 - CORRECTIONS: do not stop the flow to correct. Recast naturally instead (they say "I go there yesterday" → you say "Oh, you went there yesterday? How was it?"). Only ask what they mean if a mistake makes it unclear.
 ${isCouple() ? '- Two people are on the line: address them by name, balance turns between them, ask one then the other, and playfully tease them about each other (kindly).\n' : ''}- Messages in parentheses starting with "(App note" come from the app, not the person. Follow them silently — never read them out or mention the app.
-- Keep it kind and PG. If they directly and sincerely ask whether you are an AI, be honest, then continue warmly in character.
+${S.lang==='ko' ? `- KOREAN: use polite 해요체 by default; if they suggest dropping formalities (말 놓자 / 반말 해도 돼요) switch to friendly 반말. For beginners, speak slowly with short, simple sentences. Now and then teach one fun, natural expression or slang word in context and briefly explain it in Korean. Use Korean-style reactions (헐, 대박, 진짜요?, 아이고) naturally.
+` : ''}- Keep it kind and PG. If they directly and sincerely ask whether you are an AI, be honest, then continue warmly in character.
 
 TODAY:
 ${task}
@@ -1009,7 +1030,7 @@ function hangUp(failed){
 /* ---------- 리포트 (서버가 만듦) ---------- */
 async function makeReport(rec){
   const r = await api('report', { sessionId: rec.sessionId, transcript: rec.transcript,
-    names: me().name, level: me().level, textModel: isMaster() ? S.textModel : undefined });
+    names: me().name, level: me().level, explainLang: me().nativeLang || 'ko', textModel: isMaster() ? S.textModel : undefined });
   return r.report;
 }
 async function showReport(rec, generate){
@@ -1026,24 +1047,27 @@ async function showReport(rec, generate){
       return;
     }
   }
-  const r = rec.report, sc = r.scores || {};
+  const r0 = rec.report, sc = r0.scores || {};
+  const r = { fun: r0.fun ?? r0.fun_ko, summary: r0.summary ?? r0.summary_ko, good: r0.good ?? r0.good_ko, mission: r0.mission ?? r0.mission_ko,
+    corrections: (r0.corrections||[]).map(c=>({said:c?.said, better:c?.better, why:c?.why ?? c?.why_ko})),
+    expressions: (r0.expressions||[]).map(x=>({phrase:x?.phrase ?? x?.en, meaning:x?.meaning ?? x?.ko, example:x?.example})) };
   const m = Math.floor(rec.secs/60), s = rec.secs%60;
   const arr = v => Array.isArray(v) ? v : [];
   body.innerHTML = `
     <div class="card">
       <div class="h">${esc(rec.day)} · ${esc(rec.partnerName)} · ${m}분 ${s}초 · ${esc(rec.topic||'')}</div>
-      <div style="font-size:17px;font-weight:700;line-height:1.45;margin-bottom:8px">${rich(r.fun_ko)}</div>
-      <div class="topic">${rich(r.summary_ko)}</div>
+      <div style="font-size:17px;font-weight:700;line-height:1.45;margin-bottom:8px">${rich(r.fun)}</div>
+      <div class="topic">${rich(r.summary)}</div>
     </div>
     <div class="card"><div class="score">
       ${[['fluency','유창성'],['vocabulary','어휘'],['grammar','문법'],['confidence','자신감']].map(([k,l])=>`<div><b>${esc(sc[k]??'-')}</b><small>${l}</small></div>`).join('')}
     </div></div>
-    ${arr(r.good_ko).length ? `<div class="card"><div class="h">👏 잘한 점</div><ul class="k">${arr(r.good_ko).map(x=>`<li>${rich(x)}</li>`).join('')}</ul></div>`:''}
+    ${arr(r.good).length ? `<div class="card"><div class="h">👏 잘한 점</div><ul class="k">${arr(r.good).map(x=>`<li>${rich(x)}</li>`).join('')}</ul></div>`:''}
     ${arr(r.corrections).length ? `<div class="card"><div class="h">✏️ 이렇게 말하면 더 자연스러워요</div>${arr(r.corrections).map(c=>`
-      <div class="corr"><div class="said">${esc(c?.said)}</div><div class="better">→ ${esc(c?.better)}</div><div class="why">${rich(c?.why_ko)}</div></div>`).join('')}</div>`:''}
+      <div class="corr"><div class="said">${esc(c?.said)}</div><div class="better">→ ${esc(c?.better)}</div><div class="why">${rich(c?.why)}</div></div>`).join('')}</div>`:''}
     ${arr(r.expressions).length ? `<div class="card exp"><div class="h">🧲 훔쳐갈 표현 (다음 통화 때 상대가 다시 써줘요)</div>${arr(r.expressions).map(x=>`
-      <div><b>${esc(x?.en)}</b> <span>— ${esc(x?.ko)}</span><small>${esc(x?.example)}</small></div>`).join('')}</div>`:''}
-    ${r.mission_ko ? `<div class="card"><div class="h">🎯 다음 통화 미션</div><div class="topic">${rich(r.mission_ko)}</div></div>`:''}
+      <div><b>${esc(x?.phrase)}</b> <span>— ${esc(x?.meaning)}</span><small>${esc(x?.example)}</small></div>`).join('')}</div>`:''}
+    ${r.mission ? `<div class="card"><div class="h">🎯 다음 통화 미션</div><div class="topic">${rich(r.mission)}</div></div>`:''}
     ${txBlock(rec)}
     <button class="btn pri" data-go="home">홈으로</button>`;
 }
